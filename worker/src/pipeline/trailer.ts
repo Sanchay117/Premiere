@@ -110,7 +110,7 @@ export async function makeTrailer(
   // Shoot
   hooks.onStepStart?.("record", "Opening the app for the shoot");
   const recording = await recordPlan(capture, plan, {
-    holds: shotHolds(lines, plan),
+    holds: shotHolds(lines, plan, options.style),
     outDir: jobDir,
     onProgress: (d) => hooks.onStepProgress?.("record", d),
   });

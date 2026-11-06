@@ -9,11 +9,14 @@ import type { VoiceLine } from "../voice/deepgram";
 
 export const FPS = 30;
 /** Seconds a hype cut spends on each shot's punch title before its footage. */
-export const PUNCH = 0.8;
+export const PUNCH = 1.0;
 
 const TITLE = { voiceAt: 0.5, tail: 0.6, min: 3.0 };
 const SHOT = { voiceAt: 0.2, tail: 0.45, min: 2.6 };
 const END = { voiceAt: 0.45, tail: 1.6, min: 3.8 };
+/** Extra hold after each line in a hype cut: its scripts are short and quick, and the footage
+ *  needs a beat to land before the next title slams in. Keeps hype cuts near 45 seconds. */
+const HYPE_TAIL = 0.4;
 
 export interface Box {
   x: number;
@@ -57,15 +60,15 @@ export interface Timeline {
   skipped: { index: number; reason: string }[];
 }
 
-export function shotDuration(line: VoiceLine): number {
-  return Math.max(SHOT.min, SHOT.voiceAt + line.duration + SHOT.tail);
+export function shotDuration(line: VoiceLine, style: TrailerStyle = "walkthrough"): number {
+  return Math.max(SHOT.min, SHOT.voiceAt + line.duration + SHOT.tail + (style === "hype" ? HYPE_TAIL : 0));
 }
 
 /** Seconds of footage the recorder should film for each shot. */
-export function shotHolds(lines: VoiceLine[], plan: Plan): number[] {
+export function shotHolds(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough"): number[] {
   return plan.shots.map((_, i) => {
     const line = lines.find((l) => l.key === `shot-${i + 1}`);
-    return (line ? shotDuration(line) : SHOT.min) + 0.35;
+    return (line ? shotDuration(line, style) : SHOT.min) + 0.35;
   });
 }
 
@@ -96,7 +99,7 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
       continue;
     }
     const available = rec.end - rec.start;
-    const footage = Math.min(shotDuration(line), Math.max(SHOT.min, available));
+    const footage = Math.min(shotDuration(line, style), Math.max(SHOT.min, available));
     const actionAt = Math.max(0, rec.actionAt - rec.start);
     segments.push({
       kind: "shot",

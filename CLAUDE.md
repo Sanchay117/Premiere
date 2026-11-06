@@ -8,7 +8,7 @@ This is our entry for **Vibestarter Vibeathon 02: Night shift**. This repo will 
 
 The build window closes **9 Nov 2026, 22:00 UTC (10 Nov, 03:30 IST)**. Aim to submit by 8 Nov.
 
-As of 6 Nov: the worker has capture (Playwright, labelled screenshots, egress proxy), the planner (one Claude call, no-AI fallback, mock plans, plan cache, spend guard) and a model bake-off harness. The bake-off has not been run with the API key yet, so the planner model is not chosen. Not built yet: record, voice, music, render, web app, queue, payments.
+As of 6 Nov: the worker has capture (Playwright, labelled screenshots, egress proxy), the planner (one Claude call, no-AI fallback, mock plans, plan cache, spend guard) and a model bake-off harness. The bake-off picked **Sonnet 5.5** as the planner model. Not built yet: record, voice, music, render, web app, queue, payments.
 
 ## The hackathon
 
@@ -104,7 +104,9 @@ npm workspaces, Node 22 or later (developed on Node 26). Root scripts forward to
 
 ### Planner rules (Claude API)
 
-- Model: chosen by the bake-off between `claude-haiku-5-5`, `claude-sonnet-5-5` and `claude-opus-5-5`, all at `effort: "low"` (set with `PLANNER_MODEL`; defaults to haiku until the bake-off decides). Read the claude-api skill before changing this code.
+- Model: **`claude-sonnet-5-5` at `effort: "low"`** (override with `PLANNER_MODEL`). Read the claude-api skill before changing this code.
+- Why Sonnet (bake-off on 6 Nov, 5 apps, one run each, $0.23 total): every model produced usable plans. Sonnet 5.5 wrote the most vivid, screenshot-grounded scripts at about $0.015 and 5s per plan. Opus 5.5 was tightest on length and picked slightly better actions, at twice the cost. Haiku 5.5 was $0.001 per plan but overshot the word target on 3 of 5 apps and chose weaker actions (it clicked "Log in"). The no-AI fallback was clearly worse than all three. Rerun with `npm run bakeoff` after prompt changes.
+- Server-side refusal fallback is on for Sonnet and Opus (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`): a cyber or frontier_llm refusal is retried on Sonnet 5 inside the same call. Cost is summed over `usage.iterations`, since top-level `usage` only covers the attempt that answered. If the whole chain refuses, the no-AI fallback planner takes over.
 - Structured output via `output_config.format` with `PLAN_JSON_SCHEMA` (built from the zod schema). Do not switch to the SDK's `zodOutputFormat` helper: it turns `enum` into a description hint.
 - Exactly **one** planning call per trailer. Never a screenshot-act-screenshot agent loop.
 - Check `stop_reason`. On `refusal`, `max_tokens` or invalid JSON, use the fallback planner.
@@ -119,7 +121,7 @@ The Claude API credit is shared with another project, so Premiere must use as li
 
 - Premiere has its own Console workspace with a small monthly spend limit, and its own API key. That limit is the hard cap.
 - The key lives only in `.env` (gitignored) as `PREMIERE_ANTHROPIC_API_KEY`. It is deliberately not named `ANTHROPIC_API_KEY`, and the client is only built with that key passed explicitly, so it never picks up other credentials on the machine. Never export any API key in the shell: Claude Code would then bill the API key instead of the subscription.
-- App-side budget: `PLANNER_MONTHLY_BUDGET_USD` (default $5, keep it at or below the Console limit). Each call's cost is computed from `usage` and recorded in a ledger; once the budget is reached, the planner switches to the fallback. The ledger is a local file for now and moves to the job database when the worker goes to the VPS.
+- App-side budget: `PLANNER_MONTHLY_BUDGET_USD` (default $5, keep it at or below the Console limit). At about $0.015 per Sonnet plan, $5 covers roughly 300 trailers a month; raise both limits before judging week if traffic needs it. Each call's cost is computed from `usage` and recorded in a ledger; once the budget is reached, the planner switches to the fallback. The ledger is a local file for now and moves to the job database when the worker goes to the VPS.
 - Free trailers are gated by entrant code, with a per-visitor limit and a global daily cap.
 
 ### Safety
@@ -148,7 +150,7 @@ The worker opens arbitrary URLs, so treat every submitted URL as hostile:
 | Day | Goal |
 | --- | --- |
 | 5 Nov | Scaffold the repo; capture plus mock planner; record footage of one site locally |
-| 6 Nov | Real planner (model picked by the bake-off); voice; Remotion render; first full trailer locally |
+| 6 Nov | Real planner on Sonnet 5.5 (picked by the bake-off); voice; Remotion render; first full trailer locally |
 | 7 Nov | Web app, job queue, worker on the VPS; entrant codes; live URL up |
 | 8 Nov | USDC payment and x402; gallery of entrant trailers; hardening; submit |
 | 9 Nov | Demo video, README, Fundable, final checks; window closes 22:00 UTC |

@@ -6,10 +6,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BrowserContext, Locator, Page } from "playwright";
+import { waitForContent } from "../capture/capture";
 import { dismissCookieBanners } from "../capture/cookies";
 import type { Capture, CapturedElement } from "../capture/types";
 import type { Plan, Shot } from "../planner/schema";
-import { launchSafeBrowser, newSafeContext } from "../safety/browser";
+import { launchSafeBrowser, newSafeContext, type SafeBrowser } from "../safety/browser";
 import { assertPublicUrl } from "../safety/url-guard";
 
 export const FRAME = { width: 1920, height: 1080 } as const;
@@ -105,23 +106,25 @@ export interface RecordOptions {
   onProgress?: (detail: string) => void;
   /** Hard cap for the whole recording. */
   maxSeconds?: number;
+  /** A stage opened earlier with openStage, so filming starts at once. Opened here if missing. */
+  stage?: Promise<Stage>;
 }
 
-export async function recordPlan(capture: Capture, plan: Plan, options: RecordOptions): Promise<Recording> {
-  const landing = (await assertPublicUrl(capture.finalUrl)).href;
-  const framesDir = path.join(options.outDir, "frames");
-  await mkdir(framesDir, { recursive: true });
-  const elements = new Map(capture.elements.map((e) => [e.id, e]));
-  const sections = new Map(capture.sections.map((s) => [s.id, s]));
-  const progress = options.onProgress ?? (() => {});
-  const budgetMs = (options.maxSeconds ?? options.holds.reduce((a, b) => a + b, 0) + 75) * 1000;
-  const deadline = Date.now() + budgetMs;
+/** The app open in the hardened browser, cookie banners cleared, ready to film. */
+export interface Stage {
+  safe: SafeBrowser;
+  context: BrowserContext;
+  page: Page;
+  landing: string;
+  /** When the page started loading, for the content wait before filming. */
+  startedAt: number;
+}
 
+/** Opens the app for the shoot. The pipeline starts this while the narrator records, so the
+ *  browser launch and page load are not on the clock. */
+export async function openStage(capture: Capture): Promise<Stage> {
+  const landing = (await assertPublicUrl(capture.finalUrl)).href;
   const safe = await launchSafeBrowser();
-  const frames: RecordedFrame[] = [];
-  const shots: RecordedShot[] = [];
-  let writes: Promise<unknown> = Promise.resolve();
-  let keyframe: () => Promise<void> = async () => {};
   try {
     // Filmed at 1.5x pixel density so the render can zoom toward a target without going soft.
     const context: BrowserContext = await newSafeContext(safe.browser, { viewport: FRAME, deviceScaleFactor: PIXEL_DENSITY });
@@ -132,12 +135,44 @@ export async function recordPlan(capture: Capture, plan: Plan, options: RecordOp
     page.on("dialog", (d) => {
       d.dismiss().catch(() => {});
     });
-
-    progress("Opening the app for the shoot");
+    const startedAt = Date.now();
     await page.goto(landing, { waitUntil: "domcontentloaded", timeout: 20_000 });
     await settle(page);
     await dismissCookieBanners(page);
     await page.keyboard.press("Escape").catch(() => {});
+    return { safe, context, page, landing, startedAt };
+  } catch (err) {
+    await safe.close();
+    throw err;
+  }
+}
+
+/** Closes a stage that will not be filmed (the voice failed, say). */
+export async function closeStage(stage: Promise<Stage>): Promise<void> {
+  const opened = await stage.catch(() => null);
+  await opened?.safe.close();
+}
+
+export async function recordPlan(capture: Capture, plan: Plan, options: RecordOptions): Promise<Recording> {
+  const framesDir = path.join(options.outDir, "frames");
+  const elements = new Map(capture.elements.map((e) => [e.id, e]));
+  const sections = new Map(capture.sections.map((s) => [s.id, s]));
+  const progress = options.onProgress ?? (() => {});
+  const budgetMs = (options.maxSeconds ?? options.holds.reduce((a, b) => a + b, 0) + 75) * 1000;
+
+  progress("Opening the app for the shoot");
+  const { safe, context, page, landing, startedAt } = await (options.stage ?? openStage(capture));
+  const frames: RecordedFrame[] = [];
+  const shots: RecordedShot[] = [];
+  let writes: Promise<unknown> = Promise.resolve();
+  let keyframe: () => Promise<void> = async () => {};
+  try {
+    await mkdir(framesDir, { recursive: true });
+    // An app that draws its content late gets the same head start the capture gave it (most of
+    // it has passed while the narrator recorded), and a banner that came late goes too.
+    await waitForContent(page, startedAt);
+    await dismissCookieBanners(page);
+    const deadline = Date.now() + budgetMs;
 
     // Start filming. The screencast only sends frames when the page repaints, so a static page
     // produces none; keyframes (real screenshots) cover the start of every shot.

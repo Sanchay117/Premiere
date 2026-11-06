@@ -25,7 +25,27 @@ export interface VoiceLine {
   timing: "transcript" | "estimate";
 }
 
-export class VoiceError extends Error {}
+export class VoiceError extends Error {
+  constructor(
+    message: string,
+    readonly status = 0,
+  ) {
+    super(message);
+  }
+}
+
+/** Retries a request that hit Deepgram's concurrency limit (429) or a passing server error. */
+async function withRetry<T>(call: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await call();
+    } catch (err) {
+      const status = err instanceof VoiceError ? err.status : 0;
+      if (attempt >= 2 || !(status === 429 || status >= 500)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 700 * 2 ** attempt));
+    }
+  }
+}
 
 async function speak(text: string, model: string, key: string): Promise<Buffer> {
   const params = new URLSearchParams({ model, encoding: "linear16", container: "wav", sample_rate: String(SAMPLE_RATE) });
@@ -37,7 +57,7 @@ async function speak(text: string, model: string, key: string): Promise<Buffer> 
   });
   if (!response.ok) {
     const detail = (await response.text().catch(() => "")).slice(0, 200);
-    throw new VoiceError(`Deepgram TTS ${response.status}: ${detail}`);
+    throw new VoiceError(`Deepgram TTS ${response.status}: ${detail}`, response.status);
   }
   return Buffer.from(await response.arrayBuffer());
 }
@@ -57,7 +77,7 @@ async function transcribeWords(wav: Buffer, key: string): Promise<DeepgramWord[]
     body: new Uint8Array(wav),
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) throw new VoiceError(`Deepgram STT ${response.status}`);
+  if (!response.ok) throw new VoiceError(`Deepgram STT ${response.status}`, response.status);
   const data = (await response.json()) as {
     results?: { channels?: { alternatives?: { words?: DeepgramWord[] }[] }[] };
   };
@@ -145,22 +165,25 @@ export async function voicePlan(plan: Plan, voice: VoiceChoice, onProgress?: (de
     ...plan.shots.map((s, i) => ({ key: `shot-${i + 1}`, text: s.narration })),
     { key: "close", text: plan.close },
   ];
-  const results: VoiceLine[] = [];
-  // Two at a time keeps within Deepgram's concurrency limit.
-  for (let i = 0; i < lines.length; i += 2) {
-    const batch = lines.slice(i, i + 2);
-    onProgress?.(`Recording line ${i + 1} of ${lines.length}`);
-    const voiced = await Promise.all(
-      batch.map(async (line) => {
-        const wav = await speak(line.text, model, key);
-        const pcm = readWav(wav);
-        const duration = durationOf(pcm);
-        const transcript = await transcribeWords(wav, key).catch(() => []);
-        const { words, timing } = alignWords(line.text, transcript, duration);
-        return { key: line.key, text: line.text, pcm, duration, words, timing } satisfies VoiceLine;
-      }),
-    );
-    results.push(...voiced);
-  }
+  // Deepgram allows 15 Aura-2 requests at once per project. Five lines at a time voices a whole
+  // script in about two rounds and leaves room for anything else using the key.
+  const results: VoiceLine[] = new Array(lines.length);
+  let next = 0;
+  let done = 0;
+  onProgress?.(`Recording ${lines.length} lines`);
+  const lane = async () => {
+    while (next < lines.length) {
+      const i = next++;
+      const line = lines[i]!;
+      const wav = await withRetry(() => speak(line.text, model, key));
+      const pcm = readWav(wav);
+      const duration = durationOf(pcm);
+      const transcript = await withRetry(() => transcribeWords(wav, key)).catch(() => []);
+      const { words, timing } = alignWords(line.text, transcript, duration);
+      results[i] = { key: line.key, text: line.text, pcm, duration, words, timing };
+      onProgress?.(`Recorded ${++done} of ${lines.length} lines`);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(5, lines.length) }, lane));
   return results;
 }

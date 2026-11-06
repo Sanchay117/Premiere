@@ -20,6 +20,8 @@ import {
 
 export const VIEWPORT = { width: 1920, height: 1080 } as const;
 const PLANNER_IMAGE_WIDTH = 1024;
+/** Least time an app gets to draw its real content before it is mapped or filmed. */
+export const CONTENT_DWELL_MS = 7000;
 
 export class CaptureError extends Error {
   constructor(
@@ -72,23 +74,27 @@ export function screenshotPositions(pageHeight: number, viewportHeight: number, 
   return Array.from({ length: max }, (_, i) => Math.round((maxY * i) / (max - 1)));
 }
 
+// A page that keeps its main thread busy makes every round trip wait its turn, so each of these
+// is a single evaluate.
 async function scrollTo(page: Page, y: number): Promise<number> {
-  await page.evaluate(`window.scrollTo({ top: ${Math.round(y)}, behavior: "instant" })`);
-  return (await page.evaluate("Math.round(window.scrollY)")) as number;
+  return (await page.evaluate(`window.scrollTo({ top: ${Math.round(y)}, behavior: "instant" }); Math.round(window.scrollY)`)) as number;
+}
+
+/**
+ * Lets an app finish arriving: at least dwellMs after it started loading, then until its
+ * clickable elements and height hold still for a second (four seconds more at most). Many apps
+ * boot, sit quiet, then fetch and draw their real content several seconds in, so neither network
+ * idle nor a quiet DOM alone is enough. Shared with the recorder, which films the same page.
+ */
+export async function waitForContent(page: Page, startedAt: number, dwellMs = CONTENT_DWELL_MS): Promise<void> {
+  const remaining = startedAt + dwellMs - Date.now();
+  if (remaining > 0) await page.waitForTimeout(remaining);
+  await page.evaluate(inpageScript("wait-stable", { quietMs: 1000, maxMs: 4000, interval: 250 })).catch(() => {});
 }
 
 /** Scrolls through the page once so lazy content and scroll animations load before extraction. */
 async function scrollThrough(page: Page): Promise<void> {
-  const height = (await page.evaluate(
-    "Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)",
-  )) as number;
-  const limit = Math.min(height, VIEWPORT.height * 10);
-  for (let y = VIEWPORT.height * 0.7; y < limit; y += VIEWPORT.height * 0.7) {
-    await scrollTo(page, y);
-    await page.waitForTimeout(120);
-  }
-  await scrollTo(page, 0);
-  await page.waitForTimeout(400);
+  await page.evaluate(inpageScript("scroll-through", { viewport: VIEWPORT.height, pause: 120, settle: 400 })).catch(() => {});
 }
 
 function navigationError(err: unknown): CaptureError {
@@ -112,19 +118,26 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
   page.on("dialog", (dialog) => {
     dialog.dismiss().catch(() => {});
   });
+  // Screenshots straight from DevTools: Playwright's own screenshot makes several round trips to
+  // the page first, which costs a second or two each on apps that keep their main thread busy.
+  const cdp = await context.newCDPSession(page);
+  const snap = async (quality: number) =>
+    Buffer.from((await cdp.send("Page.captureScreenshot", { format: "jpeg", quality })).data, "base64");
 
   const notes: string[] = [];
   const warnings: string[] = [];
 
   let status = 0;
   progress(`Opening ${url.hostname}`);
+  const startedAt = Date.now();
   try {
     const response = await page.goto(url.href, { waitUntil: "domcontentloaded", timeout: options.navTimeoutMs });
     status = response?.status() ?? 0;
   } catch (err) {
     throw navigationError(err);
   }
-  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+  // Most apps go quiet within a couple of seconds; one that polls forever gets five.
+  await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(600);
 
   const finalUrl = page.url();
@@ -145,6 +158,8 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
 
   progress("Scrolling through the page");
   await scrollThrough(page);
+  progress("Waiting for the app to finish loading");
+  await waitForContent(page, startedAt);
   const lateCookieNote = await dismissCookieBanners(page);
   if (lateCookieNote) notes.push(lateCookieNote);
 
@@ -170,9 +185,9 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
     progress(`Taking screenshot ${n} of ${positions.length}`);
     const file = `shot-${n}.jpg`;
     const markedFile = `shot-${n}-marked.jpg`;
-    const clean = await page.screenshot({ type: "jpeg", quality: 85 });
+    const clean = await snap(85);
     await page.evaluate(inpageScript("marks", { show: true }));
-    const marked = await page.screenshot({ type: "jpeg", quality: 90 });
+    const marked = await snap(90);
     await page.evaluate(inpageScript("marks", { show: false }));
 
     const small = await sharp(marked).resize({ width: PLANNER_IMAGE_WIDTH }).jpeg({ quality: 75 }).toBuffer();

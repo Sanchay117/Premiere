@@ -12,7 +12,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
   const download = new URL(request.url).searchParams.has("download") ? "?download=1" : "";
   const range = request.headers.get("range");
-  const response = await workerFetch(`/jobs/${id}/files/${file}${download}`, { headers: range ? { range } : {} });
+  // The viewer's abort travels on to the worker, so a video someone stops watching does not keep
+  // the worker's file open.
+  const response = await workerFetch(`/jobs/${id}/files/${file}${download}`, { headers: range ? { range } : {}, signal: request.signal });
   if (!response.ok || !response.body) return new Response("Not found", { status: response.status === 416 ? 416 : 404 });
   const headers = new Headers();
   for (const name of PASS_HEADERS) {

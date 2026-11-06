@@ -11,11 +11,11 @@ import type { StoredCapture } from "../capture/types";
 import { hostLabel } from "../lib/url";
 import { NARRATORS, narratorFor, type CaptionStyle, type TrailerOptions } from "../options";
 import type { Plan } from "../planner/schema";
-import { recordPlan } from "../record/recorder";
+import { closeStage, openStage, recordPlan } from "../record/recorder";
 import { renderTrailer, type RenderOutputs } from "../render/render";
 import { buildTimeline, FPS, shotHolds, toSrt, type Timeline } from "../render/timeline";
 import type { ThumbnailProps, TrailerProps, TrailerSegment } from "../render/remotion/types";
-import { voicePlan } from "../voice/deepgram";
+import { voicePlan, type VoiceLine } from "../voice/deepgram";
 
 export type TrailerStep = "voice" | "record" | "render";
 
@@ -101,10 +101,19 @@ export async function makeTrailer(
   await mkdir(jobDir, { recursive: true });
   const { capture } = stored;
 
-  // Voice
+  // Voice, while the app opens for the shoot in the background: the browser launch, page load
+  // and the app's own boot happen during the narration instead of after it.
   hooks.onStepStart?.("voice", "The narrator is reading the script");
+  const stage = openStage(capture);
+  stage.catch(() => {}); // the recorder awaits it, and a failure surfaces there
   const narrator = NARRATORS[narratorFor(options.voice, plan.mood)];
-  const lines = await voicePlan(plan, options.voice, (d) => hooks.onStepProgress?.("voice", d));
+  let lines: VoiceLine[];
+  try {
+    lines = await voicePlan(plan, options.voice, (d) => hooks.onStepProgress?.("voice", d));
+  } catch (err) {
+    await closeStage(stage);
+    throw err;
+  }
   const totalVoice = lines.reduce((a, l) => a + l.duration, 0);
   hooks.onStepDone?.("voice", `${narrator.name} read ${lines.length} lines, ${totalVoice.toFixed(1)} s of narration`);
 
@@ -114,6 +123,7 @@ export async function makeTrailer(
     holds: shotHolds(lines, plan, options.style),
     outDir: jobDir,
     onProgress: (d) => hooks.onStepProgress?.("record", d),
+    stage,
   });
   const timeline = buildTimeline(lines, plan, recording, options.style);
   const filmed = timeline.segments.filter((s) => s.kind === "shot").length;

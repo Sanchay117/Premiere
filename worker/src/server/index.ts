@@ -14,12 +14,14 @@ import { timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import http from "node:http";
+import { pipeline } from "node:stream";
 import path from "node:path";
 import { config } from "../config";
 import { assertPublicUrl, UnsafeUrlError } from "../safety/url-guard";
 import { parseOptions, type TrailerOptions } from "../options";
 import { charge, paymentConfig, paymentsEnabled, pricing } from "../payments";
 import { accessRequired, admit } from "./access";
+import { warmRenderer } from "../render/render";
 import { galleryEntries } from "./gallery";
 import { createJob, findJob, jobFile, toView } from "./jobs";
 import type { PlannerChoice } from "./types";
@@ -177,11 +179,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
         return;
       }
       res.writeHead(206, { ...headers, "content-range": `bytes ${start}-${end}/${info.size}`, "content-length": end - start + 1 });
-      createReadStream(file, { start, end }).pipe(res);
+      // pipeline, not pipe: when a viewer stops a video early, pipe would leave the file open.
+      pipeline(createReadStream(file, { start, end }), res, () => {});
       return;
     }
     res.writeHead(200, { ...headers, "content-length": info.size });
-    createReadStream(file).pipe(res);
+    pipeline(createReadStream(file), res, () => {});
     return;
   }
 
@@ -201,6 +204,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
+  warmRenderer();
   console.log(`Premiere worker on http://${HOST}:${PORT} (Claude ${config.apiKey ? "on" : "off"}, default ${config.model})`);
   if (!TOKEN && HOST !== "127.0.0.1" && HOST !== "localhost") {
     console.warn("WORKER_TOKEN is not set while listening beyond localhost. Set it before exposing the worker.");

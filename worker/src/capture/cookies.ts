@@ -1,7 +1,7 @@
 // Cookie and consent banners cover the footage, so the capture (and later the recorder)
 // gets rid of them. Prefers the privacy-preserving choice: reject, then accept, then hide.
 
-import type { Frame, Page } from "playwright";
+import type { Page } from "playwright";
 import { inpageScript } from "./inpage-scripts";
 
 const REJECT_SELECTORS = [
@@ -59,36 +59,15 @@ const BANNER = [
 
 const BUTTONS = "button, [role='button'], a, input[type='button'], input[type='submit']";
 
-async function label(frame: Frame, selector: string): Promise<string> {
-  const text = await frame
-    .locator(selector)
-    .first()
-    .innerText({ timeout: 500 })
-    .catch(() => "");
-  return text.replace(/\s+/g, " ").trim().slice(0, 40) || selector;
-}
-
-async function clickKnown(frame: Frame, selectors: string[]): Promise<string | null> {
-  for (const selector of selectors) {
-    const button = frame.locator(selector).first();
-    if (!(await button.isVisible().catch(() => false))) continue;
-    const text = await label(frame, selector);
-    if (await button.click({ timeout: 1500 }).then(() => true, () => false)) return text;
-  }
-  return null;
-}
-
-async function clickByText(frame: Frame, pattern: RegExp): Promise<string | null> {
-  const buttons = frame.locator(BANNER).locator(BUTTONS).filter({ hasText: pattern });
-  const count = Math.min(await buttons.count().catch(() => 0), 8);
-  for (let i = 0; i < count; i++) {
-    const button = buttons.nth(i);
-    if (!(await button.isVisible().catch(() => false))) continue;
-    const text = (await button.innerText({ timeout: 500 }).catch(() => "")).replace(/\s+/g, " ").trim();
-    if (await button.click({ timeout: 1500 }).then(() => true, () => false)) return text || "button";
-  }
-  return null;
-}
+/** What find-consent.js looks for, best choice first. */
+const FIND = {
+  rejectSelectors: REJECT_SELECTORS,
+  rejectText: REJECT_TEXT.source,
+  acceptSelectors: ACCEPT_SELECTORS,
+  acceptText: ACCEPT_TEXT.source,
+  banner: BANNER,
+  buttons: BUTTONS,
+};
 
 /** Returns a note describing what was dismissed, or null when no banner was found. */
 export async function dismissCookieBanners(page: Page): Promise<string | null> {
@@ -100,14 +79,14 @@ export async function dismissCookieBanners(page: Page): Promise<string | null> {
         /consent|cookie|cmp|privacy|sp_message|gdpr|trustarc|usercentrics|didomi/i.test(f.url()),
     );
   for (const frame of frames) {
-    const hit =
-      (await clickKnown(frame, REJECT_SELECTORS)) ??
-      (await clickByText(frame, REJECT_TEXT)) ??
-      (await clickKnown(frame, ACCEPT_SELECTORS)) ??
-      (await clickByText(frame, ACCEPT_TEXT));
-    if (hit) {
-      await page.waitForTimeout(500);
-      return `Dismissed a cookie banner ("${hit}").`;
+    // One in-page pass finds and tags the candidates; clicks only happen when there is a banner.
+    const labels = (await frame.evaluate(inpageScript("find-consent", FIND)).catch(() => [])) as string[];
+    for (const [i, text] of labels.entries()) {
+      const button = frame.locator(`[data-premiere-consent="${i}"]`).first();
+      if (await button.click({ timeout: 1500 }).then(() => true, () => false)) {
+        await page.waitForTimeout(500);
+        return `Dismissed a cookie banner ("${text || "button"}").`;
+      }
     }
   }
   const hidden = (await page.evaluate(inpageScript("hide-overlays")).catch(() => 0)) as number;

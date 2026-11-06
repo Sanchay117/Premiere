@@ -17,7 +17,7 @@ function TickBox({ on }: { on: boolean }) {
   return (
     <span aria-hidden className="relative inline-block size-4 shrink-0 border-2 border-paper-ink">
       {on && (
-        <svg viewBox="0 0 16 16" className="absolute -inset-1 size-6 text-ticket">
+        <svg viewBox="0 0 16 16" className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 text-ticket">
           <path d="M3 3 L13 13 M13 3 L3 13" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
         </svg>
       )}

@@ -200,7 +200,18 @@ function ShotScene({ segment, frames, base }: { segment: TrailerSegment; frames:
   const ringIn = interpolate(t, [actionAt - 0.4, actionAt], [0, 1], CLAMP);
   // A click often changes the page under the target, so the ring lets go soon after it.
   const ringOut = segment.action === "click" ? interpolate(t, [actionAt + 0.5, actionAt + 0.95], [1, 0], CLAMP) : 1;
-  const ring = box ? ringIn * ringOut : 0;
+  // The ring marks the thing being used, so only clicks, hovers and typing get one, and only
+  // when the target sits wholly in frame and is smaller than most of the screen. A scroll moves
+  // the page under any ring, and a ring around the whole screen points at nothing.
+  const ringable =
+    pointing &&
+    box !== null &&
+    box.x >= -2 &&
+    box.y >= -2 &&
+    box.x + box.w <= W + 2 &&
+    box.y + box.h <= H + 2 &&
+    box.w * box.h < W * H * 0.45;
+  const ring = ringable ? ringIn * ringOut : 0;
   const rippleAt = target ? toScreen(target.x, target.y) : null;
 
   return (
@@ -217,7 +228,7 @@ function ShotScene({ segment, frames, base }: { segment: TrailerSegment; frames:
               height: box.h + 16,
               borderRadius: 12,
               border: "3px solid #ffb547",
-              boxShadow: "0 0 0 9999px rgba(0,0,0,0.16), 0 0 36px rgba(255,181,71,0.7)",
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.3), 0 0 36px rgba(255,181,71,0.7)",
               opacity: ring * 0.95,
             }}
           />

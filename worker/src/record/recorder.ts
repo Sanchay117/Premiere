@@ -243,11 +243,16 @@ export async function recordPlan(capture: Capture, plan: Plan, options: RecordOp
                 await sleep(900);
                 box = await boxOf(locator);
               } else if (section) {
+                // The heading lands about a fifth of the way down, clear of sticky headers, with
+                // the section's content filling the frame below it.
                 const heading = p.getByRole("heading", { name: section.heading.slice(0, 60) }).first();
                 if (await heading.isVisible().catch(() => false)) {
-                  await heading.evaluate((node) => node.scrollIntoView({ block: "start", behavior: "smooth" }));
+                  await heading.evaluate((node) => {
+                    const top = node.getBoundingClientRect().top + window.scrollY;
+                    window.scrollTo({ top: Math.max(0, top - window.innerHeight * 0.22), behavior: "smooth" });
+                  });
                 } else {
-                  await p.evaluate((y) => window.scrollTo({ top: Math.max(0, y - 140), behavior: "smooth" }), section.y);
+                  await p.evaluate((y) => window.scrollTo({ top: Math.max(0, y - window.innerHeight * 0.22), behavior: "smooth" }), section.y);
                 }
                 await sleep(900);
                 box = (await heading.isVisible().catch(() => false)) ? await boxOf(heading) : null;

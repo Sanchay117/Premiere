@@ -19,6 +19,7 @@ import { chooseThumbnail } from "../render/thumbnail";
 import { buildTimeline, FPS, shotHolds, toSrt, type Timeline } from "../render/timeline";
 import type { ThumbnailProps, TrailerProps, TrailerSegment } from "../render/remotion/types";
 import { silentLines, voicePlan, type VoiceLine } from "../voice/deepgram";
+import { kokoroLines, kokoroVoiceName } from "../voice/kokoro";
 
 export type TrailerStep = "voice" | "record" | "render";
 
@@ -159,6 +160,7 @@ export async function makeTrailer(
   }
   if (filmed === 0) throw new Error("None of the shots could be filmed on this page.");
   if (!voiced.narrated) notes.unshift("The narrator could not be reached, so this trailer has captions and music only.");
+  else if (voiced.backup) notes.unshift(`The usual narrator could not be reached, so ${voiced.backup}, a backup voice, read this trailer.`);
   hooks.onStepDone?.(
     "record",
     `${filmed} of ${shotPlan.shots.length} shots filmed${timeline.skipped.length ? `, ${timeline.skipped.length} skipped` : ""}`,
@@ -225,7 +227,7 @@ export async function makeTrailer(
     duration: timeline.duration,
     shotsFilmed: filmed,
     shotsSkipped: timeline.skipped,
-    voice: voiced.narrated ? narratorName(shotPlan, options) : "Captions only",
+    voice: !voiced.narrated ? "Captions only" : (voiced.backup ?? narratorName(shotPlan, options)),
     plan: shotPlan,
     notes,
   };
@@ -235,25 +237,34 @@ const narratorName = (plan: Plan, options: TrailerOptions) => NARRATORS[narrator
 
 interface Voiced {
   lines: VoiceLine[];
-  /** False when the voice service failed and the lines are captions only. */
+  /** False when no voice could be had and the lines are captions only. */
   narrated: boolean;
+  /** The backup narrator's name, when Deepgram failed and Kokoro read the script instead. */
+  backup?: string;
 }
 
-/** Voices the plan; if the voice service cannot be reached (an outage, a spent account, no key),
- *  the lines become captions timed for reading, so the trailer still ships with music. The
- *  service's error goes to the worker's log, not the page. */
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** Voices the plan with Deepgram; if it cannot be reached (an outage, a spent account, no key),
+ *  with Kokoro on the worker; and if that fails too, the lines become captions timed for reading,
+ *  so the trailer still ships with music. Errors go to the worker's log, not the page. */
 async function voiceOrCaptions(plan: Plan, options: TrailerOptions, onProgress: (detail: string) => void): Promise<Voiced> {
   try {
     return { lines: await voicePlan(plan, options.voice, onProgress), narrated: true };
   } catch (err) {
-    console.error(`narration failed, making a captions-only trailer: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`Deepgram narration failed, trying the Kokoro backup voice: ${message(err)}`);
+  }
+  try {
+    onProgress("The usual narrator is unavailable; the backup voice is reading the script");
+    return { lines: await kokoroLines(plan, options.voice, onProgress), narrated: true, backup: kokoroVoiceName(options.voice, plan.mood) };
+  } catch (err) {
+    console.error(`Kokoro narration failed too, making a captions-only trailer: ${message(err)}`);
     return { lines: silentLines(plan), narrated: false };
   }
 }
 
 function voiceDetail(voiced: Voiced, narrator: string): string {
   const seconds = voiced.lines.reduce((a, l) => a + l.duration, 0).toFixed(1);
-  return voiced.narrated
-    ? `${narrator} read ${voiced.lines.length} lines, ${seconds} s of narration`
-    : `The narrator could not be reached, so the ${voiced.lines.length} lines go on as captions`;
+  if (!voiced.narrated) return `The narrator could not be reached, so the ${voiced.lines.length} lines go on as captions`;
+  return `${voiced.backup ? `${voiced.backup}, the backup voice,` : narrator} read ${voiced.lines.length} lines, ${seconds} s of narration`;
 }

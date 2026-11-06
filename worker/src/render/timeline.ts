@@ -10,13 +10,51 @@ import type { VoiceLine } from "../voice/deepgram";
 export const FPS = 30;
 /** Seconds a hype cut spends on each shot's punch title before its footage. */
 export const PUNCH = 1.0;
+/** The shortest a punch title gets when a hype cut runs long. */
+const PUNCH_MIN = 0.75;
 
-const TITLE = { voiceAt: 0.5, tail: 0.6, min: 3.0 };
+type Card = { voiceAt: number; tail: number; min: number };
+const TITLE: Card = { voiceAt: 0.5, tail: 0.6, min: 3.0 };
 const SHOT = { voiceAt: 0.2, tail: 0.45, min: 2.6 };
-const END = { voiceAt: 0.45, tail: 1.6, min: 3.8 };
+const END: Card = { voiceAt: 0.45, tail: 1.6, min: 3.8 };
 /** Extra hold after each line in a hype cut: its scripts are short and quick, and the footage
- *  needs a beat to land before the next title slams in. Keeps hype cuts near 45 seconds. */
+ *  needs a beat to land before the next title slams in. */
 const HYPE_TAIL = 0.4;
+/** The most a long hype cut may eat into the pause after each line (0.45 s down to 0.2 s). */
+const HYPE_TAIL_MIN = -0.25;
+/** A hype cut that would run longer than this trims its punch titles and beats evenly. */
+const HYPE_TARGET = 46;
+
+/** How long each punch title runs, and the beat added to (or taken from) the pause after each line. */
+export interface Pacing {
+  punch: number;
+  tail: number;
+}
+
+const cardDuration = (card: Card, line: VoiceLine | undefined) => Math.max(card.min, card.voiceAt + (line?.duration ?? 0) + card.tail);
+
+/**
+ * The cut's rhythm. A hype cut gets a full second of punch title and a beat after every line,
+ * trimmed evenly toward the minimums when the narration would carry it past 46 seconds, so a
+ * slow narrator or a seventh shot does not turn a 45 second trailer into 54. A walkthrough has
+ * neither. The recorder and the edit both use this, so footage and cut always agree.
+ */
+export function pacing(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough"): Pacing {
+  if (style !== "hype") return { punch: 0, tail: 0 };
+  const byKey = new Map(lines.map((l) => [l.key, l]));
+  const total = (punch: number, tail: number) =>
+    cardDuration(TITLE, byKey.get("hook")) +
+    cardDuration(END, byKey.get("close")) +
+    plan.shots.reduce((sum, _, i) => {
+      const line = byKey.get(`shot-${i + 1}`);
+      return sum + punch + (line ? shotDuration(line, tail) : SHOT.min);
+    }, 0);
+  const full = total(PUNCH, HYPE_TAIL);
+  if (full <= HYPE_TARGET) return { punch: PUNCH, tail: HYPE_TAIL };
+  const tight = total(PUNCH_MIN, HYPE_TAIL_MIN);
+  const k = tight >= HYPE_TARGET ? 1 : (full - HYPE_TARGET) / (full - tight);
+  return { punch: PUNCH - (PUNCH - PUNCH_MIN) * k, tail: HYPE_TAIL - (HYPE_TAIL - HYPE_TAIL_MIN) * k };
+}
 
 export interface Box {
   x: number;
@@ -60,15 +98,17 @@ export interface Timeline {
   skipped: { index: number; reason: string }[];
 }
 
-export function shotDuration(line: VoiceLine, style: TrailerStyle = "walkthrough"): number {
-  return Math.max(SHOT.min, SHOT.voiceAt + line.duration + SHOT.tail + (style === "hype" ? HYPE_TAIL : 0));
+/** Seconds of footage a shot gets: its line, the pauses around it and the cut's beat. */
+export function shotDuration(line: VoiceLine, tail = 0): number {
+  return Math.max(SHOT.min, SHOT.voiceAt + line.duration + SHOT.tail + tail);
 }
 
 /** Seconds of footage the recorder should film for each shot. */
 export function shotHolds(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough"): number[] {
+  const { tail } = pacing(lines, plan, style);
   return plan.shots.map((_, i) => {
     const line = lines.find((l) => l.key === `shot-${i + 1}`);
-    return (line ? shotDuration(line, style) : SHOT.min) + 0.35;
+    return (line ? shotDuration(line, tail) : SHOT.min) + 0.35;
   });
 }
 
@@ -82,10 +122,10 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
   const skipped: Timeline["skipped"] = [];
   const clicks: number[] = [];
   const hits: number[] = [];
-  const punch = style === "hype" ? PUNCH : 0;
+  const { punch, tail } = pacing(lines, plan, style);
   let t = 0;
 
-  const titleDuration = Math.max(TITLE.min, TITLE.voiceAt + hook.duration + TITLE.tail);
+  const titleDuration = cardDuration(TITLE, hook);
   segments.push({ kind: "title", start: t, duration: titleDuration, voiceAt: t + TITLE.voiceAt, line: hook });
   t += titleDuration;
   const titleEnd = t;
@@ -99,7 +139,7 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
       continue;
     }
     const available = rec.end - rec.start;
-    const footage = Math.min(shotDuration(line, style), Math.max(SHOT.min, available));
+    const footage = Math.min(shotDuration(line, tail), Math.max(SHOT.min, available));
     const actionAt = Math.max(0, rec.actionAt - rec.start);
     segments.push({
       kind: "shot",
@@ -115,7 +155,7 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
   }
 
   const endStart = t;
-  const endDuration = Math.max(END.min, END.voiceAt + close.duration + END.tail);
+  const endDuration = cardDuration(END, close);
   segments.push({ kind: "end", start: t, duration: endDuration, voiceAt: t + END.voiceAt, line: close });
   t += endDuration;
 

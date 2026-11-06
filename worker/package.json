@@ -10,6 +10,7 @@
     "bakeoff": "tsx src/cli/bakeoff.ts",
     "spend": "tsx src/cli/spend.ts",
     "serve": "tsx src/server/index.ts",
+    "trailer": "tsx src/cli/trailer.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },

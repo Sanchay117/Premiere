@@ -150,11 +150,16 @@ async function run(job: Job): Promise<void> {
     });
     job.dir = stored.dir;
     const c = stored.capture;
+    const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
     finishStep(
       job,
       "capture",
       "done",
-      `${c.elements.length} things to click, ${c.sections.length} sections, ${c.screenshots.length} screenshot${c.screenshots.length === 1 ? "" : "s"}`,
+      [
+        count(c.elements.length, "thing to click", "things to click"),
+        count(c.sections.length, "section", "sections"),
+        count(c.screenshots.length, "screenshot", "screenshots"),
+      ].join(", "),
     );
 
     current = "plan";

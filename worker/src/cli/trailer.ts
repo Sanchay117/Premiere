@@ -1,7 +1,8 @@
-// npm run trailer -- <url> [--planner haiku|sonnet|opus|none] [--style hype|walkthrough]
+// npm run trailer -- <url> [--planner opus|sonnet|haiku|none] [--style hype|walkthrough]
 //                          [--voice auto|atlas|zeus|...] [--captions karaoke|boxed|bold|off] [--fresh] [--recapture]
 // npm run trailer -- --rerender <job folder or name> [--captions karaoke|boxed|bold|off] [--thumbnails]
-// Makes a whole trailer from a URL, the same way a job does, and prints where the files are.
+// Makes a whole trailer from a URL, the same way a job does (Opus writes the script unless
+// --planner says otherwise), and prints where the files are.
 // --rerender renders a finished job again from its edit.json and footage (no new voice or filming),
 // for iterating on the look; --captions swaps the caption look while doing so, and --thumbnails
 // renders only the two thumbnails.
@@ -20,7 +21,7 @@ import { fail, seconds } from "./shared";
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
-    planner: { type: "string", default: "sonnet" },
+    planner: { type: "string" },
     style: { type: "string" },
     voice: { type: "string" },
     captions: { type: "string" },

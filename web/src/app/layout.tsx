@@ -41,7 +41,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <IntroProvider>
           <SmoothScroll>{children}</SmoothScroll>
         </IntroProvider>
-        <div className="grain" aria-hidden />
       </body>
     </html>
   );

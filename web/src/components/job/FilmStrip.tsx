@@ -71,7 +71,7 @@ function Frame({ step, n }: { step: JobStepView; n: number }) {
         <span className="font-mono text-[11px] text-cream-faint">{String(n).padStart(2, "0")}</span>
         <StatusIcon status={step.status} />
       </div>
-      <p className="relative mt-3 font-serif text-[1.35rem] leading-tight">{step.label}</p>
+      <p className="relative mt-3 text-[15px] font-medium leading-tight text-cream">{step.label}</p>
       <p className="relative mt-2 text-xs leading-snug text-cream-dim">
         {step.status === "soon" ? "Coming soon" : step.detail ?? "Waiting"}
       </p>

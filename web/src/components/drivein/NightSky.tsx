@@ -22,6 +22,7 @@ export function NightSky() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(to_bottom,#04050a_0%,#070915_45%,#11152a_78%,#1a1a2c_100%)]" />
+      <div className="grain-bg absolute inset-0" />
       {/* faint milky band */}
       <div className="absolute -left-1/4 top-[8%] h-[38%] w-[150%] -rotate-[14deg] bg-[radial-gradient(ellipse_at_center,rgb(111_130_190/0.10),transparent_65%)] blur-2xl" />
       <svg className="parallax-far absolute inset-0 h-full w-full" preserveAspectRatio="none">

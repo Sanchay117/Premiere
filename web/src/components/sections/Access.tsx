@@ -44,7 +44,7 @@ export function Access() {
               >
                 <div className="flex-1 p-7">
                   <p className="eyebrow">{t.who}</p>
-                  <p className="mt-6 font-serif text-6xl leading-none text-cream">{t.price}</p>
+                  <p className="mt-6 font-[family-name:var(--font-marquee)] text-[4.4rem] leading-[0.85] tracking-[0.03em] text-cream">{t.price}</p>
                   <p className="mt-5 leading-relaxed text-cream-dim">{t.note}</p>
                 </div>
                 <div className="flex w-14 items-center justify-center border-l border-dashed border-line-strong bg-amber/[0.06]">

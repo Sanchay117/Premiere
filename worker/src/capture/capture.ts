@@ -248,8 +248,10 @@ export async function capturePage(rawUrl: string, opts: CaptureOptions): Promise
     maxScreenshots: 4,
     navTimeoutMs: 20_000,
     totalTimeoutMs: 60_000,
-    onProgress: () => {},
     ...opts,
+    // After the spread: callers pass onProgress: undefined when they have none, which would
+    // otherwise replace this default (npm run capture failed with "progress is not a function").
+    onProgress: opts.onProgress ?? (() => {}),
   };
   const url = await assertPublicUrl(rawUrl);
   await mkdir(options.outDir, { recursive: true });

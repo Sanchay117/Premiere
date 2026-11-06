@@ -6,7 +6,9 @@ This is our entry for **Vibestarter Vibeathon 02: Night shift**. This repo will 
 
 ## Status
 
-As of 5 Nov 2026 nothing is built. The build window is open and closes **9 Nov 2026, 22:00 UTC (10 Nov, 03:30 IST)**. Aim to submit by 8 Nov.
+The build window closes **9 Nov 2026, 22:00 UTC (10 Nov, 03:30 IST)**. Aim to submit by 8 Nov.
+
+As of 6 Nov: the worker has capture (Playwright, labelled screenshots, egress proxy), the planner (one Claude call, no-AI fallback, mock plans, plan cache, spend guard) and a model bake-off harness. The bake-off has not been run with the API key yet, so the planner model is not chosen. Not built yet: record, voice, music, render, web app, queue, payments.
 
 ## The hackathon
 
@@ -16,7 +18,7 @@ As of 5 Nov 2026 nothing is built. The build window is open and closes **9 Nov 2
 | Event page | https://app.vibestarter.xyz/vibeathon |
 | Rules | https://blog.vibestarter.xyz/vibeathon-02 |
 | Community | Discord https://discord.gg/Kfpj89bu82 · X https://x.com/vibestarterxyz |
-| Field | 138 applications; expect far fewer finished builds |
+| Field | 131 builders entered (organizer's figure); expect far fewer finished builds |
 
 **Timeline (every deadline is 22:00 UTC):** build 2 to 9 Nov, judging and holder vote 9 to 16 Nov, results from 16 Nov. Submissions stay editable until the build window closes.
 
@@ -72,7 +74,24 @@ web (site + API)  ->  job queue  ->  worker  ->  storage  ->  web shows the resu
 
 - **Web:** Next.js on Vercel. Landing page, job form, job status page, payment and x402 routes.
 - **Queue and storage:** a free-tier hosted database for jobs, and object storage for the outputs. Pick the simplest option and note the choice here.
-- **Worker:** a Node process with Playwright, Remotion and ffmpeg. It cannot run on Vercel. Run it on the Mac during development and on a small VPS for judging week (9 to 16 Nov), so it doesn't depend on a laptop staying awake.
+- **Worker:** a Node process with Playwright, Remotion and ffmpeg. It cannot run on Vercel. Run it on the dev machine during development and on a small VPS for judging week (9 to 16 Nov), so it doesn't depend on a laptop staying awake.
+
+### Repo layout and commands
+
+npm workspaces, Node 22 or later (developed on Node 26). Root scripts forward to the worker.
+
+- `worker/src/capture`: Playwright capture. In-page scripts live in `capture/inpage/*.js` as plain JS, sent to the page as text (the TypeScript loader would otherwise inject helpers that do not exist in the page).
+- `worker/src/planner`: schema, prompt, Claude call, fallback, validation, plan cache, mock plans, pricing and spend ledger.
+- `worker/src/safety`: URL checks, egress proxy, hardened browser launch. Reuse `launchSafeBrowser` for every browser that opens a submitted URL, including the recorder.
+- `worker/.data` (gitignored): captures, plan cache, spend ledger, bake-off reports. `worker/fixtures/plans` (committed): mock plans.
+
+| Command | What it does |
+| --- | --- |
+| `npm run capture -- <url>` | Fresh capture; prints elements, sections and screenshot paths |
+| `npm run plan -- <url> [--planner claude\|mock\|fallback] [--model haiku\|sonnet\|opus] [--fresh] [--save-mock]` | Plans one trailer the way a job would and prints the script |
+| `npm run bakeoff -- [urls] [--models haiku,sonnet,opus] [--effort low] [--save-mock <model>]` | Plans each app with every model plus the fallback; writes a side-by-side report |
+| `npm run spend` | This month's API spend against the app-side budget |
+| `npm test`, `npm run typecheck` | Unit tests (includes a real browser check that redirects to private addresses are blocked) and types |
 
 ### The pipeline (one job)
 
@@ -85,33 +104,31 @@ web (site + API)  ->  job queue  ->  worker  ->  storage  ->  web shows the resu
 
 ### Planner rules (Claude API)
 
-- Model `claude-haiku-5-5` at `effort: "low"`, structured output via `output_config.format`. Read the claude-api skill before writing this code.
+- Model: chosen by the bake-off between `claude-haiku-5-5`, `claude-sonnet-5-5` and `claude-opus-5-5`, all at `effort: "low"` (set with `PLANNER_MODEL`; defaults to haiku until the bake-off decides). Read the claude-api skill before changing this code.
+- Structured output via `output_config.format` with `PLAN_JSON_SCHEMA` (built from the zod schema). Do not switch to the SDK's `zodOutputFormat` helper: it turns `enum` into a description hint.
 - Exactly **one** planning call per trailer. Never a screenshot-act-screenshot agent loop.
 - Check `stop_reason`. On `refusal`, `max_tokens` or invalid JSON, use the fallback planner.
 - Plans are cached per normalized URL, so re-rendering the same app costs nothing.
 - `PLANNER=mock` returns saved example plans. Use it for all work on recording, voice and rendering.
-- **Fallback planner (no AI):** tour the primary call-to-action, top navigation links and a scroll of the landing page, with a script built from the title and meta description. The app must keep working at $0 if the API is unavailable or the budget is hit.
+- Every plan, from any planner, goes through `validatePlan`: unknown ids, external, mailto and destructive clicks, and typing into sensitive fields are dropped; em dashes are cleaned out of the copy.
+- **Fallback planner (no AI):** hold on the hero, hover the primary call to action, scroll to the strongest sections (or hover the controls of a single-screen app), then click in, with a script built only from the page's own prose (description, headings, visible text). The app must keep working at $0 if the API is unavailable or the budget is hit.
 
 ### API budget
 
 The Claude API credit is shared with another project, so Premiere must use as little as possible.
 
-- Premiere has its own Console workspace with a small monthly spend limit, and its own API key.
-- The key lives only in `.env` (gitignored). Never export `ANTHROPIC_API_KEY` in the shell: Claude Code would then bill the API key instead of the subscription.
+- Premiere has its own Console workspace with a small monthly spend limit, and its own API key. That limit is the hard cap.
+- The key lives only in `.env` (gitignored) as `PREMIERE_ANTHROPIC_API_KEY`. It is deliberately not named `ANTHROPIC_API_KEY`, and the client is only built with that key passed explicitly, so it never picks up other credentials on the machine. Never export any API key in the shell: Claude Code would then bill the API key instead of the subscription.
+- App-side budget: `PLANNER_MONTHLY_BUDGET_USD` (default $5, keep it at or below the Console limit). Each call's cost is computed from `usage` and recorded in a ledger; once the budget is reached, the planner switches to the fallback. The ledger is a local file for now and moves to the job database when the worker goes to the VPS.
 - Free trailers are gated by entrant code, with a per-visitor limit and a global daily cap.
 
 ### Safety
 
 The worker opens arbitrary URLs, so treat every submitted URL as hostile:
 - Allow only `http` and `https`. Resolve the hostname and refuse private, loopback, link-local and cloud-metadata addresses, including after redirects.
+- How: the URL is checked before launch, then every browser connection goes through a local egress proxy (`safety/egress-proxy.ts`) that resolves the host itself, refuses non-public addresses and connects to the exact IP it checked. This covers redirects, subresources, iframes and DNS rebinding. Playwright's `route()` is not enough on its own: redirect hops skip it.
 - No downloads, no file access, no extra permissions. Fresh browser context per job.
 - Hard limits on page load time, total job time and output size.
-
-## Reference code (already built, reuse the patterns)
-
-- `../Akindo_MUSD_MEZO/video`: the closest match. Remotion plus Playwright frame-by-frame capture under a fake clock (`scripts/capture.ts`), Deepgram TTS (`scripts/tts.ts`), word timestamps (`scripts/words.ts`), synthesized sound (`scripts/sfx.ts`), loudness mastering (`scripts/master.ts`), thumbnail still (`src/Thumbnail.tsx`, `npm run thumb`).
-- `../Twitch/video/heist-demo` and `../Appwrite/scripts`: Python and ffmpeg render pipelines with narration and verification.
-- `../Arc_Studio/earnest`: USDC on an EVM chain with wagmi and viem.
 
 ## Priorities
 
@@ -131,7 +148,7 @@ The worker opens arbitrary URLs, so treat every submitted URL as hostile:
 | Day | Goal |
 | --- | --- |
 | 5 Nov | Scaffold the repo; capture plus mock planner; record footage of one site locally |
-| 6 Nov | Real planner on Haiku; voice; Remotion render; first full trailer locally |
+| 6 Nov | Real planner (model picked by the bake-off); voice; Remotion render; first full trailer locally |
 | 7 Nov | Web app, job queue, worker on the VPS; entrant codes; live URL up |
 | 8 Nov | USDC payment and x402; gallery of entrant trailers; hardening; submit |
 | 9 Nov | Demo video, README, Fundable, final checks; window closes 22:00 UTC |

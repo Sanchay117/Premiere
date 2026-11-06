@@ -1,6 +1,9 @@
 // What the job server returns. web/src/lib/types.ts mirrors this file; keep them in sync.
 
+import type { TrailerOptions } from "../options";
 import type { Plan } from "../planner/schema";
+
+export type { TrailerOptions };
 
 export type PlannerChoice = "haiku" | "sonnet" | "opus" | "none";
 export type StepKey = "capture" | "plan" | "voice" | "record" | "render";
@@ -50,6 +53,8 @@ export interface JobResultView {
     duration: number;
     shotsFilmed: number;
     shotsSkipped: { index: number; reason: string }[];
+    /** The narrator who read it, for example Atlas. */
+    narrator: string;
   } | null;
 }
 
@@ -64,4 +69,7 @@ export interface JobView {
   steps: JobStepView[];
   error: string | null;
   result: JobResultView | null;
+  options: TrailerOptions;
+  /** The person agreed to let Premiere feature this trailer in the gallery. */
+  gallery: boolean;
 }

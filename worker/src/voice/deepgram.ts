@@ -2,17 +2,11 @@
 // speech-to-text on the audio we just generated (Aura does not return timestamps itself).
 
 import { config } from "../config";
+import { NARRATORS, narratorFor, type VoiceChoice } from "../options";
 import type { Plan } from "../planner/schema";
 import { durationOf, readWav, type Pcm } from "../audio/wav";
 
 const SAMPLE_RATE = 48000;
-
-export const VOICES: Record<Plan["mood"], string> = {
-  energetic: "aura-2-atlas-en",
-  bold: "aura-2-atlas-en",
-  playful: "aura-2-asteria-en",
-  calm: "aura-2-athena-en",
-};
 
 export interface Word {
   text: string;
@@ -142,10 +136,10 @@ export function alignWords(text: string, transcript: DeepgramWord[], duration: n
 }
 
 /** Voices every narration line of a plan: hook, each shot, close. */
-export async function voicePlan(plan: Plan, onProgress?: (detail: string) => void): Promise<VoiceLine[]> {
+export async function voicePlan(plan: Plan, voice: VoiceChoice, onProgress?: (detail: string) => void): Promise<VoiceLine[]> {
   const key = config.deepgramKey;
   if (!key) throw new VoiceError("DEEPGRAM_KEY is not set in .env");
-  const model = VOICES[plan.mood];
+  const model = NARRATORS[narratorFor(voice, plan.mood)].model;
   const lines = [
     { key: "hook", text: plan.hook },
     ...plan.shots.map((s, i) => ({ key: `shot-${i + 1}`, text: s.narration })),

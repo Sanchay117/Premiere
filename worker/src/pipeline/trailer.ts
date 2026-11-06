@@ -9,6 +9,7 @@ import { synthScore } from "../audio/music";
 import { writeWav } from "../audio/wav";
 import type { StoredCapture } from "../capture/types";
 import { hostLabel } from "../lib/url";
+import { NARRATORS, narratorFor, type CaptionStyle, type TrailerOptions } from "../options";
 import type { Plan } from "../planner/schema";
 import { recordPlan } from "../record/recorder";
 import { renderTrailer, type RenderOutputs } from "../render/render";
@@ -30,13 +31,19 @@ interface EditFile {
   thumbnail: Omit<ThumbnailProps, "base">;
 }
 
-/** Renders a finished job again from its saved edit and footage. For iterating on the look. */
-export async function rerenderTrailer(jobDir: string, onProgress?: (fraction: number) => void): Promise<RenderOutputs> {
+/** Renders a finished job again from its saved edit and footage. For iterating on the look; the
+ *  caption look can be swapped without new voice or filming. */
+export async function rerenderTrailer(
+  jobDir: string,
+  onProgress?: (fraction: number) => void,
+  overrides: { captions?: CaptionStyle } = {},
+): Promise<RenderOutputs> {
   const edit = JSON.parse(await readFile(path.join(jobDir, "edit.json"), "utf8")) as Partial<EditFile>;
   if (edit.version !== EDIT_VERSION || !edit.trailer || !edit.thumbnail) {
     throw new Error(`${jobDir} has no edit.json this version can re-render. Make the trailer again instead.`);
   }
-  return renderTrailer(jobDir, edit.trailer, edit.thumbnail, onProgress);
+  const trailer = overrides.captions ? { ...edit.trailer, captions: overrides.captions } : edit.trailer;
+  return renderTrailer(jobDir, trailer, edit.thumbnail, onProgress);
 }
 
 export interface TrailerHooks {
@@ -53,6 +60,7 @@ export interface TrailerResult {
   duration: number;
   shotsFilmed: number;
   shotsSkipped: { index: number; reason: string }[];
+  /** The narrator's name, for example Atlas. */
   voice: string;
 }
 
@@ -74,21 +82,30 @@ function trailerSegments(timeline: Timeline): TrailerSegment[] {
       out.actionAt = segment.shot.actionAt;
       out.action = segment.shot.action;
       out.box = segment.shot.box;
+      out.punchFrames = toFrames(segment.shot.punch);
+      out.title = segment.shot.title;
     }
     from += frames;
     return out;
   });
 }
 
-export async function makeTrailer(stored: StoredCapture, plan: Plan, jobDir: string, hooks: TrailerHooks = {}): Promise<TrailerResult> {
+export async function makeTrailer(
+  stored: StoredCapture,
+  plan: Plan,
+  jobDir: string,
+  options: TrailerOptions,
+  hooks: TrailerHooks = {},
+): Promise<TrailerResult> {
   await mkdir(jobDir, { recursive: true });
   const { capture } = stored;
 
   // Voice
   hooks.onStepStart?.("voice", "The narrator is reading the script");
-  const lines = await voicePlan(plan, (d) => hooks.onStepProgress?.("voice", d));
+  const narrator = NARRATORS[narratorFor(options.voice, plan.mood)];
+  const lines = await voicePlan(plan, options.voice, (d) => hooks.onStepProgress?.("voice", d));
   const totalVoice = lines.reduce((a, l) => a + l.duration, 0);
-  hooks.onStepDone?.("voice", `${lines.length} lines, ${totalVoice.toFixed(1)} s of narration`);
+  hooks.onStepDone?.("voice", `${narrator.name} read ${lines.length} lines, ${totalVoice.toFixed(1)} s of narration`);
 
   // Shoot
   hooks.onStepStart?.("record", "Opening the app for the shoot");
@@ -97,7 +114,7 @@ export async function makeTrailer(stored: StoredCapture, plan: Plan, jobDir: str
     outDir: jobDir,
     onProgress: (d) => hooks.onStepProgress?.("record", d),
   });
-  const timeline = buildTimeline(lines, plan, recording);
+  const timeline = buildTimeline(lines, plan, recording, options.style);
   const filmed = timeline.segments.filter((s) => s.kind === "shot").length;
   if (filmed === 0) throw new Error("None of the shots could be filmed on this page.");
   hooks.onStepDone?.(
@@ -107,7 +124,13 @@ export async function makeTrailer(stored: StoredCapture, plan: Plan, jobDir: str
 
   // Sound and cut
   hooks.onStepStart?.("render", "Scoring and mixing the soundtrack");
-  const score = synthScore(timeline.duration, plan.mood, { titleEnd: timeline.titleEnd, endStart: timeline.endStart, clicks: timeline.clicks });
+  const score = synthScore(timeline.duration, plan.mood, {
+    titleEnd: timeline.titleEnd,
+    endStart: timeline.endStart,
+    clicks: timeline.clicks,
+    hits: timeline.hits,
+    hype: options.style === "hype",
+  });
   const mix = mixSoundtrack(
     timeline.duration,
     timeline.segments.map((s) => ({ pcm: s.line.pcm, at: s.voiceAt })),
@@ -132,7 +155,16 @@ export async function makeTrailer(stored: StoredCapture, plan: Plan, jobDir: str
     url: capture.finalUrl,
     duration: timeline.duration,
     skipped: timeline.skipped,
-    trailer: { fps: FPS, durationInFrames, app, segments, frames: recording.frames, soundtrack: "soundtrack.wav" },
+    trailer: {
+      fps: FPS,
+      durationInFrames,
+      app,
+      segments,
+      frames: recording.frames,
+      soundtrack: "soundtrack.wav",
+      style: options.style,
+      captions: options.captions,
+    },
     thumbnail: { app, frame: backdrop?.file ?? "" },
   };
   await writeFile(path.join(jobDir, "edit.json"), JSON.stringify(edit, null, 2));
@@ -152,6 +184,6 @@ export async function makeTrailer(stored: StoredCapture, plan: Plan, jobDir: str
     duration: timeline.duration,
     shotsFilmed: filmed,
     shotsSkipped: timeline.skipped,
-    voice: lines[0] ? "Deepgram Aura-2" : "none",
+    voice: narrator.name,
   };
 }

@@ -18,6 +18,7 @@ test("srt cues never overlap and never leave a short straggler", () => {
     titleEnd: 3.6,
     endStart: 3.6,
     clicks: [],
+    hits: [],
     skipped: [],
   };
   const srt = toSrt(timeline);

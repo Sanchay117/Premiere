@@ -17,6 +17,7 @@
     "plan": "npm run -w worker plan --",
     "bakeoff": "npm run -w worker bakeoff --",
     "trailer": "npm run -w worker trailer --",
+    "gallery": "npm run -w worker gallery --",
     "spend": "npm run -w worker spend",
     "test": "npm run -w worker test",
     "typecheck": "npm run -w worker typecheck && npm run -w web typecheck"

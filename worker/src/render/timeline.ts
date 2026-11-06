@@ -2,11 +2,14 @@
 // that was filmed, and an end card. Durations follow the voice, so the cut never outruns or
 // trails the narrator. Also builds the caption words and the SRT file.
 
+import type { TrailerStyle } from "../options";
 import type { Plan, Shot } from "../planner/schema";
 import type { Recording } from "../record/recorder";
 import type { VoiceLine } from "../voice/deepgram";
 
 export const FPS = 30;
+/** Seconds a hype cut spends on each shot's punch title before its footage. */
+export const PUNCH = 0.8;
 
 const TITLE = { voiceAt: 0.5, tail: 0.6, min: 3.0 };
 const SHOT = { voiceAt: 0.2, tail: 0.45, min: 2.6 };
@@ -32,9 +35,13 @@ export interface TimelineSegment {
     action: Shot["action"];
     /** Recording seconds where this segment's footage starts. */
     footageStart: number;
-    /** Seconds after the segment start when the action happens. */
+    /** Seconds after the footage starts when the action happens. */
     actionAt: number;
     box: Box | null;
+    /** Seconds of punch title before the footage (0 in a walkthrough). */
+    punch: number;
+    /** The punch title itself. */
+    title: string;
   };
 }
 
@@ -45,6 +52,8 @@ export interface Timeline {
   endStart: number;
   /** Trailer seconds of each click or type action, for sound effects. */
   clicks: number[];
+  /** Trailer seconds where a punch title slams in, for impacts in the score. */
+  hits: number[];
   skipped: { index: number; reason: string }[];
 }
 
@@ -60,7 +69,7 @@ export function shotHolds(lines: VoiceLine[], plan: Plan): number[] {
   });
 }
 
-export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recording): Timeline {
+export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recording, style: TrailerStyle = "walkthrough"): Timeline {
   const byKey = new Map(lines.map((l) => [l.key, l]));
   const hook = byKey.get("hook");
   const close = byKey.get("close");
@@ -69,6 +78,8 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
   const segments: TimelineSegment[] = [];
   const skipped: Timeline["skipped"] = [];
   const clicks: number[] = [];
+  const hits: number[] = [];
+  const punch = style === "hype" ? PUNCH : 0;
   let t = 0;
 
   const titleDuration = Math.max(TITLE.min, TITLE.voiceAt + hook.duration + TITLE.tail);
@@ -85,18 +96,19 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
       continue;
     }
     const available = rec.end - rec.start;
-    const duration = Math.min(shotDuration(line), Math.max(SHOT.min, available));
+    const footage = Math.min(shotDuration(line), Math.max(SHOT.min, available));
     const actionAt = Math.max(0, rec.actionAt - rec.start);
     segments.push({
       kind: "shot",
       start: t,
-      duration,
-      voiceAt: t + SHOT.voiceAt,
+      duration: punch + footage,
+      voiceAt: t + punch + SHOT.voiceAt,
       line,
-      shot: { index: rec.index, action: shot.action, footageStart: rec.start, actionAt, box: rec.box },
+      shot: { index: rec.index, action: shot.action, footageStart: rec.start, actionAt, box: rec.box, punch, title: shot.punch },
     });
-    if (shot.action === "click" || shot.action === "type") clicks.push(t + actionAt);
-    t += duration;
+    if (shot.action === "click" || shot.action === "type") clicks.push(t + punch + actionAt);
+    if (punch) hits.push(t);
+    t += punch + footage;
   }
 
   const endStart = t;
@@ -104,7 +116,7 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
   segments.push({ kind: "end", start: t, duration: endDuration, voiceAt: t + END.voiceAt, line: close });
   t += endDuration;
 
-  return { segments, duration: t, titleEnd, endStart, clicks, skipped };
+  return { segments, duration: t, titleEnd, endStart, clicks, hits, skipped };
 }
 
 function srtTime(seconds: number): string {

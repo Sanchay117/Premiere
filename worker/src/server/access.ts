@@ -21,6 +21,8 @@ export interface AccessDecision {
   reason?: string;
   /** Which code was used, for logs. Never the visitor. */
   code?: string;
+  /** The refusal is about the entrant code, so the form should ask for one. */
+  needsCode?: boolean;
 }
 
 function parseCodes(raw: string | undefined): Map<string, number> {
@@ -90,9 +92,9 @@ export function admit(code: string | undefined, visitor: string): Promise<Access
     const state = await readState();
     const normalized = code?.trim().toUpperCase() ?? "";
     if (accessRequired) {
-      if (!normalized) return { ok: false, reason: "Free trailers need an entrant code. Grab one in the Vibestarter Discord." };
+      if (!normalized) return { ok: false, needsCode: true, reason: "Free trailers need an entrant code. Grab one in the Vibestarter Discord." };
       const max = CODES.get(normalized);
-      if (max === undefined) return { ok: false, reason: "That entrant code is not valid. Check it in the Vibestarter Discord." };
+      if (max === undefined) return { ok: false, needsCode: true, reason: "That entrant code is not valid. Check it in the Vibestarter Discord." };
       if ((state.codes[normalized] ?? 0) >= max) return { ok: false, reason: "That entrant code has been used up." };
     }
     if (state.total >= DAILY_CAP) return { ok: false, reason: "Tonight's free screenings are full. Come back tomorrow." };

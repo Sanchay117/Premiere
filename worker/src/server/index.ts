@@ -1,8 +1,9 @@
 // npm run serve (in worker/) or npm run dev (repo root, with the web app).
 // Small HTTP API the web app calls server-side:
-//   POST /jobs                    { url, planner: "haiku" | "sonnet" | "opus" | "none", fresh? } -> 202 { id }
-//   GET  /jobs/:id                -> JobView
-//   GET  /jobs/:id/files/:name    -> one of the job's screenshots
+//   POST /jobs                    { url, planner?, style?, voice?, captions?, gallery?, code?, fresh? } -> 202 { id }
+//   GET  /jobs/:id                -> JobView (live, or read back from the job's job.json)
+//   GET  /jobs/:id/files/:name    -> a screenshot, or the trailer, thumbnails and captions once rendered
+//   GET  /gallery                 -> approved trailers whose makers opted in, newest first
 //   GET  /health
 // Binds to 127.0.0.1 by default. Set WORKER_TOKEN (here and in the web app) before exposing it.
 
@@ -13,8 +14,10 @@ import http from "node:http";
 import path from "node:path";
 import { config } from "../config";
 import { assertPublicUrl, UnsafeUrlError } from "../safety/url-guard";
+import { parseOptions, type TrailerOptions } from "../options";
 import { accessRequired, admit } from "./access";
-import { createJob, getJob, jobFile, toView } from "./jobs";
+import { galleryEntries } from "./gallery";
+import { createJob, findJob, jobFile, toView } from "./jobs";
 import type { PlannerChoice } from "./types";
 
 const PORT = Number(process.env.WORKER_PORT) || 8787;
@@ -29,11 +32,48 @@ const CONTENT_TYPES: Record<string, string> = {
   ".srt": "application/x-subrip; charset=utf-8",
 };
 
-function send(res: http.ServerResponse, status: number, body: unknown): void {
+function send(res: http.ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   const json = JSON.stringify(body);
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers });
   res.end(json);
 }
+
+type JobRequest =
+  | { ok: true; url: URL; planner: PlannerChoice; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined }
+  | { ok: false; status: number; error: string };
+
+/** Parses and checks an order for a trailer. The URL is vetted before anything is charged. */
+async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
+  let body: Record<string, unknown>;
+  try {
+    body = await readJson(req);
+  } catch {
+    return { ok: false, status: 400, error: "Send JSON like { \"url\": \"yourapp.xyz\" }." };
+  }
+  const rawUrl = typeof body.url === "string" ? body.url.trim().slice(0, 2000) : "";
+  if (!rawUrl) return { ok: false, status: 400, error: "Paste a link to your app." };
+  const planner = PLANNERS.includes(body.planner as PlannerChoice) ? (body.planner as PlannerChoice) : "sonnet";
+  let url: URL;
+  try {
+    url = await assertPublicUrl(rawUrl);
+  } catch (err) {
+    const message = err instanceof UnsafeUrlError || err instanceof Error ? err.message : "That link does not work.";
+    return { ok: false, status: 400, error: message };
+  }
+  return {
+    ok: true,
+    url,
+    planner,
+    options: parseOptions(body),
+    gallery: body.gallery !== false,
+    fresh: body.fresh === true,
+    code: typeof body.code === "string" ? body.code.slice(0, 64) : undefined,
+  };
+}
+
+/** The web app forwards a hashed visitor id; direct callers fall back to their socket address. */
+const visitorOf = (req: http.IncomingMessage) => String(req.headers["x-visitor"] ?? req.socket.remoteAddress ?? "unknown").slice(0, 128);
+
 
 function authorized(req: http.IncomingMessage): boolean {
   if (!TOKEN) return true;
@@ -62,41 +102,26 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     return send(res, 200, { ok: true, claude: Boolean(config.apiKey), voice: Boolean(config.deepgramKey), model: config.model, accessRequired });
   }
 
+  // The website's box office: free trailers within the daily limits.
   if (req.method === "POST" && pathname === "/jobs") {
-    let body: Record<string, unknown>;
-    try {
-      body = await readJson(req);
-    } catch {
-      return send(res, 400, { error: "Send JSON like { \"url\": \"yourapp.xyz\" }." });
-    }
-    const rawUrl = typeof body.url === "string" ? body.url.trim().slice(0, 2000) : "";
-    if (!rawUrl) return send(res, 400, { error: "Paste a link to your app." });
-    const planner = PLANNERS.includes(body.planner as PlannerChoice) ? (body.planner as PlannerChoice) : "sonnet";
-    let url: URL;
-    try {
-      url = await assertPublicUrl(rawUrl);
-    } catch (err) {
-      const message = err instanceof UnsafeUrlError || err instanceof Error ? err.message : "That link does not work.";
-      return send(res, 400, { error: message });
-    }
-    // The web app forwards a hashed visitor id; direct callers fall back to their socket address.
-    const visitor = String(req.headers["x-visitor"] ?? req.socket.remoteAddress ?? "unknown").slice(0, 128);
-    const decision = await admit(typeof body.code === "string" ? body.code.slice(0, 64) : undefined, visitor);
-    if (!decision.ok) return send(res, 403, { error: decision.reason });
-    const job = createJob(url.href, planner, body.fresh === true);
+    const order = await readJobRequest(req);
+    if (!order.ok) return send(res, order.status, { error: order.error });
+    const decision = await admit(order.code, visitorOf(req));
+    if (!decision.ok) return send(res, 403, { error: decision.reason, needsCode: decision.needsCode ?? false });
+    const job = createJob(order.url.href, order.planner, order.fresh, order.options, order.gallery);
     console.log(`job ${job.id.slice(0, 8)} admitted${decision.code ? ` with code ${decision.code}` : ""}`);
     return send(res, 202, { id: job.id });
   }
 
   const jobMatch = pathname.match(/^\/jobs\/([0-9a-f-]{36})$/);
   if (req.method === "GET" && jobMatch) {
-    const job = getJob(jobMatch[1]!);
+    const job = await findJob(jobMatch[1]!);
     return job ? send(res, 200, toView(job)) : send(res, 404, { error: "No such job. It may have expired." });
   }
 
   const fileMatch = pathname.match(/^\/jobs\/([0-9a-f-]{36})\/files\/([\w.-]+)$/);
   if (req.method === "GET" && fileMatch) {
-    const job = getJob(fileMatch[1]!);
+    const job = await findJob(fileMatch[1]!);
     const name = fileMatch[2]!;
     const file = job ? jobFile(job, name) : null;
     if (!file) return send(res, 404, { error: "Not found" });
@@ -126,6 +151,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     res.writeHead(200, { ...headers, "content-length": info.size });
     createReadStream(file).pipe(res);
     return;
+  }
+
+  if (req.method === "GET" && pathname === "/gallery") {
+    return send(res, 200, { trailers: await galleryEntries() });
   }
 
   send(res, 404, { error: "Not found" });

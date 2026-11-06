@@ -1,19 +1,21 @@
 // In-process job queue for the worker server. One job runs at a time because each one drives a
-// real browser. Jobs live in memory (the newest 200 are kept); a hosted queue can replace this
-// without changing the HTTP API.
+// real browser. Live jobs sit in memory (the newest 200); every job that ends is also saved as
+// job.json in its folder, so its screening room and gallery entry survive a restart.
 
 import { randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { CaptureError } from "../capture/capture";
 import { loadOrCapture } from "../capture/store";
 import { config, MODELS } from "../config";
+import type { TrailerOptions } from "../options";
 import { makeTrailer } from "../pipeline/trailer";
 import { planTrailer } from "../planner/index";
 import { UnsafeUrlError } from "../safety/url-guard";
 import { VoiceError } from "../voice/deepgram";
 import type { JobStepView, JobView, PlannerChoice, StepKey } from "./types";
 
-interface Job extends JobView {
+export interface Job extends JobView {
   fresh: boolean;
   /** Capture directory, for serving screenshots. */
   dir: string | null;
@@ -21,6 +23,13 @@ interface Job extends JobView {
   outDir: string;
 }
 
+/** What job.json holds: the view, plus where the screenshots live (relative to the data folder). */
+interface SavedJob {
+  view: JobView;
+  captureDir: string | null;
+}
+
+const JOB_FILE = "job.json";
 const OUTPUT_FILES = new Set(["trailer.mp4", "thumbnail-1920.png", "thumbnail-1280.png", "captions.srt"]);
 
 const MAX_JOBS = 200;
@@ -29,12 +38,12 @@ const jobs = new Map<string, Job>();
 const queue: string[] = [];
 let running = 0;
 
-const STEPS: { key: StepKey; label: string; built: boolean }[] = [
-  { key: "capture", label: "Opening the app", built: true },
-  { key: "plan", label: "Writing the script", built: true },
-  { key: "voice", label: "Recording the voiceover", built: true },
-  { key: "record", label: "Filming the app", built: true },
-  { key: "render", label: "Final cut", built: true },
+const STEPS: { key: StepKey; label: string }[] = [
+  { key: "capture", label: "Opening the app" },
+  { key: "plan", label: "Writing the script" },
+  { key: "voice", label: "Recording the voiceover" },
+  { key: "record", label: "Filming the app" },
+  { key: "render", label: "Final cut" },
 ];
 
 const PLANNER_NAMES: Record<PlannerChoice, string> = {
@@ -45,6 +54,7 @@ const PLANNER_NAMES: Record<PlannerChoice, string> = {
 };
 
 const now = () => new Date().toISOString();
+const jobDir = (id: string) => path.join(config.dataDir, "jobs", id);
 
 function touch(job: Job): void {
   job.updatedAt = now();
@@ -66,27 +76,22 @@ function finishStep(job: Job, key: StepKey, status: "done" | "failed", detail: s
   touch(job);
 }
 
-export function createJob(url: string, planner: PlannerChoice, fresh: boolean): Job {
+export function createJob(url: string, planner: PlannerChoice, fresh: boolean, options: TrailerOptions, gallery: boolean): Job {
   const id = randomUUID();
   const job: Job = {
     id,
-    outDir: path.join(config.dataDir, "jobs", id),
+    outDir: jobDir(id),
     url,
     planner,
     status: "queued",
     queuePosition: null,
     createdAt: now(),
     updatedAt: now(),
-    steps: STEPS.map(({ key, label, built }) => ({
-      key,
-      label,
-      status: built ? "pending" : "soon",
-      detail: built ? null : "Not built yet",
-      startedAt: null,
-      endedAt: null,
-    })),
+    steps: STEPS.map(({ key, label }) => ({ key, label, status: "pending", detail: null, startedAt: null, endedAt: null })),
     error: null,
     result: null,
+    options,
+    gallery,
     fresh,
     dir: null,
   };
@@ -101,8 +106,29 @@ export function createJob(url: string, planner: PlannerChoice, fresh: boolean): 
   return job;
 }
 
-export function getJob(id: string): Job | undefined {
-  return jobs.get(id);
+async function saveJob(job: Job): Promise<void> {
+  const saved: SavedJob = { view: toView(job), captureDir: job.dir ? path.relative(config.dataDir, job.dir) : null };
+  await mkdir(job.outDir, { recursive: true });
+  await writeFile(path.join(job.outDir, JOB_FILE), JSON.stringify(saved));
+}
+
+/** A live job, or a finished one read back from its job.json. */
+export async function findJob(id: string): Promise<Job | undefined> {
+  const live = jobs.get(id);
+  if (live) return live;
+  if (!/^[0-9a-f-]{36}$/.test(id)) return undefined;
+  try {
+    const saved = JSON.parse(await readFile(path.join(jobDir(id), JOB_FILE), "utf8")) as SavedJob;
+    return {
+      ...saved.view,
+      queuePosition: null,
+      fresh: false,
+      dir: saved.captureDir ? path.join(config.dataDir, saved.captureDir) : null,
+      outDir: jobDir(id),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export function toView(job: Job): JobView {
@@ -129,6 +155,7 @@ function pump(): void {
       .catch((err) => console.error(`job ${id} crashed:`, err))
       .finally(() => {
         running--;
+        saveJob(job).catch((err) => console.error(`job ${id} could not be saved:`, err));
         pump();
       });
   }
@@ -137,7 +164,8 @@ function pump(): void {
 async function run(job: Job): Promise<void> {
   job.status = "running";
   touch(job);
-  console.log(`job ${job.id.slice(0, 8)} ${job.planner} ${job.url}`);
+  const { style, voice, captions } = job.options;
+  console.log(`job ${job.id.slice(0, 8)} ${job.planner} ${style}/${voice}/${captions} ${job.url}`);
   let current: StepKey = "capture";
   try {
     startStep(job, "capture", "Starting a fresh browser");
@@ -166,11 +194,11 @@ async function run(job: Job): Promise<void> {
     startStep(
       job,
       "plan",
-      job.planner === "none" ? "Building a script from the page's own words" : `${PLANNER_NAMES[job.planner]} is writing the script`,
+      job.planner === "none" ? "Building a script from the page's own words" : `${PLANNER_NAMES[job.planner]} is writing the ${style} script`,
     );
     const result = await planTrailer(
       stored,
-      job.planner === "none" ? { planner: "fallback" } : { planner: "claude", model: MODELS[job.planner] },
+      job.planner === "none" ? { planner: "fallback", style } : { planner: "claude", model: MODELS[job.planner], style },
     );
     const attempt = result.attempt;
     const shots = result.plan.shots.length;
@@ -212,7 +240,7 @@ async function run(job: Job): Promise<void> {
     touch(job);
 
     // The storyboard is visible from here; the trailer follows.
-    const trailer = await makeTrailer(stored, result.plan, job.outDir, {
+    const trailer = await makeTrailer(stored, result.plan, job.outDir, job.options, {
       onStepStart: (key, detail) => {
         current = key;
         startStep(job, key, detail);
@@ -230,6 +258,7 @@ async function run(job: Job): Promise<void> {
       duration: trailer.duration,
       shotsFilmed: trailer.shotsFilmed,
       shotsSkipped: trailer.shotsSkipped,
+      narrator: trailer.voice,
     };
     job.status = "done";
     touch(job);

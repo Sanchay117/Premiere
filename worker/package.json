@@ -12,7 +12,9 @@
     "serve": "tsx src/server/index.ts",
     "trailer": "tsx src/cli/trailer.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "gallery": "tsx src/cli/gallery.ts",
+    "voice-samples": "tsx src/cli/voice-samples.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",

@@ -94,10 +94,20 @@ export interface ScoreCues {
   endStart: number;
   /** Seconds: click moments for soft ticks. */
   clicks: number[];
+  /** Seconds: punch titles in a hype cut. Each gets a short riser and an impact, and the groove
+   *  drops out under it. */
+  hits?: number[];
+  /** A hype cut: the groove runs at least 124 bpm with a full kit. */
+  hype?: boolean;
 }
 
 export function synthScore(duration: number, mood: Mood, cues: ScoreCues, sampleRate = 48000): Pcm {
-  const style = STYLES[mood];
+  const base = STYLES[mood];
+  const style: MoodStyle = cues.hype
+    ? { ...base, bpm: Math.max(base.bpm, 124), kick: "four", hats: true, bassLevel: Math.max(base.bassLevel, 0.6) }
+    : base;
+  const hits = cues.hits ?? [];
+  const underPunch = (t: number) => hits.some((h) => t >= h - 0.02 && t < h + 0.55);
   const n = Math.ceil(duration * sampleRate);
   const left = new Float32Array(n);
   const right = new Float32Array(n);
@@ -141,6 +151,7 @@ export function synthScore(duration: number, mood: Mood, cues: ScoreCues, sample
   const grooveEnd = cues.endStart;
   for (let tBeat = grooveStart; tBeat < grooveEnd; tBeat += beat / 2) {
     const step = Math.round((tBeat - grooveStart) / (beat / 2));
+    if (underPunch(tBeat)) continue;
     const onBeat = step % 2 === 0;
     const beatInBar = Math.floor(step / 2) % 4;
     const start = Math.floor(tBeat * sampleRate);
@@ -236,6 +247,28 @@ export function synthScore(duration: number, mood: Mood, cues: ScoreCues, sample
       const kt = k / sampleRate;
       const s = Math.sin(2 * Math.PI * 2200 * kt) * Math.exp(-kt * 180) * 0.07;
       add(start + k, s, s);
+    }
+  }
+
+  // Punch titles: a short swell, then a sub drop with a crack on top.
+  for (const at of hits) {
+    const swell = 0.32;
+    const swellStart = Math.floor((at - swell) * sampleRate);
+    let lpSwell = 0;
+    for (let k = 0; k < swell * sampleRate; k++) {
+      const p = k / (swell * sampleRate);
+      lpSwell += (0.02 + p * 0.4) * (noise() - lpSwell);
+      const s = lpSwell * p * p * 0.13;
+      add(swellStart + k, s, s);
+    }
+    const hitStart = Math.floor(at * sampleRate);
+    let hitPhase = 0;
+    for (let k = 0; k < sampleRate * 0.75; k++) {
+      const kt = k / sampleRate;
+      hitPhase += (40 + 95 * Math.exp(-kt * 20)) / sampleRate;
+      const boom = Math.sin(2 * Math.PI * hitPhase) * Math.exp(-kt * 4.5) * 0.44;
+      const crack = noise() * Math.exp(-kt * 28) * 0.13;
+      add(hitStart + k, boom + crack, boom + crack * 0.8);
     }
   }
 

@@ -8,7 +8,7 @@ This is our entry for **Vibestarter Vibeathon 02: Night shift**. This repo will 
 
 The build window closes **9 Nov 2026, 22:00 UTC (10 Nov, 03:30 IST)**. Aim to submit by 8 Nov.
 
-As of 6 Nov: the worker has capture (Playwright, labelled screenshots, egress proxy), the planner (one Claude call, no-AI fallback, mock plans, plan cache, spend guard), a model bake-off harness and an HTTP job server. The bake-off picked **Sonnet 5.5** as the planner model. The website runs locally: the drive-in landing page and the screening room, where a job shows live progress and a storyboard preview built from the screenshots and the plan, with a planner picker for testing. Not built yet: record, voice, music, render (so no trailer.mp4 yet), entrant codes, payments, hosting.
+As of 6 Nov: URL to trailer works end to end, locally, from the website and the command line. The worker captures the app (Playwright, egress proxy), plans it (one Sonnet 5.5 call, no-AI fallback, plan cache, spend guard), voices it (Deepgram Aura-2 with word timings), films it, scores and masters the sound (-16 LUFS), and renders `trailer.mp4`, two thumbnails and `captions.srt` with Remotion, in about 100 seconds. The website shows live progress, then the trailer with download links. Free trailers are gated by entrant code with daily limits. Not built yet: USDC payment, the x402 endpoint, hosting (Vercel plus a VPS for the worker), the homepage sample trailer and gallery, the Kokoro fallback voice.
 
 ## The hackathon
 
@@ -88,6 +88,8 @@ npm workspaces, Node 22 or later (developed on Node 26). Root scripts forward to
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Worker job server (port 8787) and the website (port 3000) together |
+| `npm run trailer -- <url> [--planner sonnet\|opus\|haiku\|none]` | A whole trailer from the command line, the same way a job makes one |
+| `npm run trailer -- --rerender <job>` | Renders a finished job again from its `edit.json` and footage (no new voice or filming), for iterating on the look |
 | `npm run capture -- <url>` | Fresh capture; prints elements, sections and screenshot paths |
 | `npm run plan -- <url> [--planner claude\|mock\|fallback] [--model haiku\|sonnet\|opus] [--fresh] [--save-mock]` | Plans one trailer the way a job would and prints the script |
 | `npm run bakeoff -- [urls] [--models haiku,sonnet,opus] [--effort low] [--save-mock <model>]` | Plans each app with every model plus the fallback; writes a side-by-side report |
@@ -98,10 +100,10 @@ npm workspaces, Node 22 or later (developed on Node 26). Root scripts forward to
 
 1. **Capture (no AI).** Playwright opens the URL at 1920×1080 and collects the title, meta description, headings, every clickable element (with a stable id), and 3 or 4 screenshots downscaled to about 1024 px wide. Dismiss cookie banners. If the app is behind a login, stay on the public pages.
 2. **Plan (one AI call).** Claude returns a JSON shot list: ordered actions (click, scroll, type, hover, wait) that target element ids, with one narration line per shot, a title card and a closing call to action. About 110 words of narration for 45 seconds. Validate the output against the schema; if it fails, use the fallback planner.
-3. **Record (no AI).** Playwright replays the shot list while recording. Each step has a timeout, a failed step is skipped, and the whole recording has a hard time cap.
-4. **Voice.** Deepgram Aura-2 for narration, with word timestamps for captions (key: `DEEPGRAM_KEY` in `.env`). Fallback: Kokoro, an open-source voice model that runs on the worker.
-5. **Music and sound.** Synthesized from code, so nothing needs a license.
-6. **Render.** Remotion composition: title card, footage clips with gentle zoom toward each clicked element, captions timed to the words, end card with the app's URL and "Made with Premiere". A `<Still>` composition renders the thumbnails. Then master the loudness.
+3. **Voice** (runs before recording, so each shot is filmed for exactly as long as its line). Deepgram Aura-2, one request per line, voice picked by the plan's mood (`aura-2-atlas-en` for energetic and bold, `aura-2-asteria-en` for playful, `aura-2-athena-en` for calm). Aura returns no timestamps, so each line is transcribed with Deepgram `nova-3` and the words are aligned back onto the script (`voice/deepgram.ts`, `alignWords`). Key: `DEEPGRAM_KEY` in `.env`. Fallback still to build: Kokoro, an open-source voice model that runs on the worker.
+4. **Record (no AI).** `record/recorder.ts` replays the shot list in the hardened browser. Frames come from the Chrome DevTools screencast (JPEG, timestamped); the screencast sends nothing while a page is static, so a real screenshot is taken as a keyframe at the start of every shot. Each shot: setup off camera (find the element again, scroll it into view), a 0.7 s lead-in, the action, then a hold for the narration. Clicks fall back to a real mouse event at the element's center when Playwright's actionability checks refuse an overlaid element. A failed step is skipped in the edit, never faked; the recording has a hard time cap.
+5. **Music and sound.** `audio/music.ts` synthesizes the score per mood (tempo, chords, drums), plus a whoosh on the title, ticks on clicks, and a riser and impact into the end card. `audio/mix.ts` ducks it under the narration; ffmpeg `loudnorm` (two pass) masters the soundtrack to -16 LUFS before rendering.
+6. **Render.** `render/timeline.ts` times the edit from the voice; Remotion (`render/remotion/`) renders the title card, each filmed shot with a virtual camera that eases toward the target, an amber spotlight, a drawn cursor and click ripple (headless Chrome records no pointer), word-timed captions, and the end card with the app's URL and "Made with Premiere". A `<Still>` renders both thumbnails. Output: `trailer.mp4` (H.264 CRF 18, AAC 192k), `thumbnail-1920.png`, `thumbnail-1280.png`, `captions.srt`, plus `edit.json`. Remotion reuses Playwright's Chrome Headless Shell, and its compositor package ships the ffmpeg the worker uses, so there is no separate ffmpeg install. Remotion is free for individuals and companies of up to three people; check the license before Premiere grows past that.
 
 ### Planner rules (Claude API)
 
@@ -124,7 +126,7 @@ The Claude API credit is shared with another project, so Premiere must use as li
 - Premiere has its own Console workspace with a small monthly spend limit, and its own API key. That limit is the hard cap.
 - The key lives only in `.env` (gitignored) as `PREMIERE_ANTHROPIC_API_KEY`. It is deliberately not named `ANTHROPIC_API_KEY`, and the client is only built with that key passed explicitly, so it never picks up other credentials on the machine. Never export any API key in the shell: Claude Code would then bill the API key instead of the subscription.
 - App-side budget: `PLANNER_MONTHLY_BUDGET_USD` (default $5, keep it at or below the Console limit). At about $0.015 per Sonnet plan, $5 covers roughly 300 trailers a month; raise both limits before judging week if traffic needs it. Each call's cost is computed from `usage` and recorded in a ledger; once the budget is reached, the planner switches to the fallback. The ledger is a local file for now and moves to the job database when the worker goes to the VPS.
-- Free trailers are gated by entrant code, with a per-visitor limit and a global daily cap.
+- Free trailers are gated by entrant code, with a per-visitor limit and a global daily cap (`worker/src/server/access.ts`, set with `ACCESS_CODES`, `ACCESS_PER_VISITOR_DAILY` and `ACCESS_DAILY_CAP`). The web app sends a hash of the visitor's IP; the worker stores only an HMAC of that, keyed with a random secret it creates in `.data/access-secret`, with the day's counts in `.data/access.json`. A plain hash would not do: anyone could hash every IPv4 address and reverse it. Admission is counted when a job starts, so a failed job still uses one of the visitor's free trailers. With no codes set, access is open but the limits still apply.
 
 ### Safety
 

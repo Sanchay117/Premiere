@@ -39,8 +39,8 @@ function voiced(key: string, seconds: number): VoiceLine {
   return { key, text: "x", pcm: { sampleRate: 48000, channels: [new Float32Array(1)] }, duration: seconds, words: [], timing: "estimate" };
 }
 
-/** A hype trailer whose shot lines all take the given seconds, filmed with footage to spare. */
-function hypeCut(shotSeconds: number, shots: number) {
+/** A trailer whose shot lines all take the given seconds, filmed with footage to spare. */
+function cut(style: "hype" | "walkthrough", shotSeconds: number, shots: number) {
   const plan = {
     appName: "App",
     tagline: "",
@@ -58,8 +58,10 @@ function hypeCut(shotSeconds: number, shots: number) {
     frames: [],
     shots: plan.shots.map((_, i) => ({ index: i, ok: true, error: null, start: i * 10, actionAt: i * 10 + 0.7, end: i * 10 + 10, box: null, typed: null, url: "" })),
   } as Recording;
-  return { pacing: pacing(lines, plan, "hype"), timeline: buildTimeline(lines, plan, recording, "hype") };
+  return { pacing: pacing(lines, plan, style), timeline: buildTimeline(lines, plan, recording, style) };
 }
+
+const hypeCut = (shotSeconds: number, shots: number) => cut("hype", shotSeconds, shots);
 
 test("a hype cut keeps its full beats when it fits in 46 seconds", () => {
   const { pacing: p, timeline } = hypeCut(3.5, 6);
@@ -76,4 +78,22 @@ test("a long hype cut trims its beats evenly to land on 46 seconds", () => {
 test("a very long hype cut stops at the shortest beats", () => {
   const { pacing: p } = hypeCut(4.5, 7);
   assert.deepEqual(p, { punch: 0.75, tail: -0.25 });
+});
+
+test("a short walkthrough lingers after each line to come in near 41 seconds", () => {
+  // 90 words read over six shots of about 3 s: 31 s with no stretch.
+  const { pacing: p, timeline } = cut("walkthrough", 3, 6);
+  assert.equal(p.punch, 0);
+  assert.ok(p.tail > 1.5 && p.tail <= 1.6, `tail ${p.tail}`);
+  assert.ok(timeline.duration > 40 && timeline.duration <= 41.05, `${timeline.duration}`);
+});
+
+test("a short hype cut adds at most 0.7 s after each line, then stays short", () => {
+  const { pacing: p, timeline } = hypeCut(2.5, 5);
+  assert.deepEqual(p, { punch: 1, tail: 0.4 + 0.7 });
+  assert.ok(timeline.duration < 41, `${timeline.duration}`);
+});
+
+test("a walkthrough that already fits is left alone", () => {
+  assert.deepEqual(cut("walkthrough", 5, 6).pacing, { punch: 0, tail: 0 });
 });

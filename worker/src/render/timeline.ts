@@ -24,6 +24,13 @@ const HYPE_TAIL = 0.4;
 const HYPE_TAIL_MIN = -0.25;
 /** A hype cut that would run longer than this trims its punch titles and beats evenly. */
 const HYPE_TARGET = 46;
+/** A cut that would come in shorter than this lingers longer after each line, so a lean script
+ *  still makes a trailer of about the promised length (Opus at low effort tends to write a
+ *  walkthrough of 90 words, a 33 second cut, when asked for 110). */
+const SHORT_TARGET = 41;
+/** The most a short cut adds after each line: a calm tour can rest on a result, a hype cut only
+ *  briefly before the next title slams in. */
+const STRETCH_MAX: Record<TrailerStyle, number> = { walkthrough: 1.6, hype: 0.7 };
 
 /** How long each punch title runs, and the beat added to (or taken from) the pause after each line. */
 export interface Pacing {
@@ -37,10 +44,10 @@ const cardDuration = (card: Card, line: VoiceLine | undefined) => Math.max(card.
  * The cut's rhythm. A hype cut gets a full second of punch title and a beat after every line,
  * trimmed evenly toward the minimums when the narration would carry it past 46 seconds, so a
  * slow narrator or a seventh shot does not turn a 45 second trailer into 54. A walkthrough has
- * neither. The recorder and the edit both use this, so footage and cut always agree.
+ * neither. Either cut that would come in under 41 seconds holds each shot a little longer after
+ * its line instead. The recorder and the edit both use this, so footage and cut always agree.
  */
 export function pacing(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough"): Pacing {
-  if (style !== "hype") return { punch: 0, tail: 0 };
   const byKey = new Map(lines.map((l) => [l.key, l]));
   const total = (punch: number, tail: number) =>
     cardDuration(TITLE, byKey.get("hook")) +
@@ -49,8 +56,13 @@ export function pacing(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "wa
       const line = byKey.get(`shot-${i + 1}`);
       return sum + punch + (line ? shotDuration(line, tail) : SHOT.min);
     }, 0);
-  const full = total(PUNCH, HYPE_TAIL);
-  if (full <= HYPE_TARGET) return { punch: PUNCH, tail: HYPE_TAIL };
+  const base: Pacing = style === "hype" ? { punch: PUNCH, tail: HYPE_TAIL } : { punch: 0, tail: 0 };
+  const full = total(base.punch, base.tail);
+  const voicedShots = plan.shots.filter((_, i) => byKey.has(`shot-${i + 1}`)).length;
+  if (full < SHORT_TARGET && voicedShots > 0) {
+    return { punch: base.punch, tail: base.tail + Math.min(STRETCH_MAX[style], (SHORT_TARGET - full) / voicedShots) };
+  }
+  if (style !== "hype" || full <= HYPE_TARGET) return base;
   const tight = total(PUNCH_MIN, HYPE_TAIL_MIN);
   const k = tight >= HYPE_TARGET ? 1 : (full - HYPE_TARGET) / (full - tight);
   return { punch: PUNCH - (PUNCH - PUNCH_MIN) * k, tail: HYPE_TAIL - (HYPE_TAIL - HYPE_TAIL_MIN) * k };

@@ -1,7 +1,7 @@
 "use client";
 
 // The hero is a drive-in at night: the marquee carries the headline and spells the app being
-// typed, the box office ticket takes the order, the big screen plays the teaser, and the lot of
+// typed, the box office ticket takes the order, the big screen plays a real trailer, and the lot of
 // parked cars sits under the projector beam. Entrances are CSS, so the page reads without JS.
 
 import { useRef, useState, type PointerEvent } from "react";

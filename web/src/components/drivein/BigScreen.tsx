@@ -1,10 +1,10 @@
 "use client";
 
-// The drive-in screen: the teaser reel in a lit frame on posts, with the projector beam rising
+// The drive-in screen: a real trailer in a lit frame on posts, with the projector beam rising
 // from the lot behind the cars and dust drifting through the light.
 
 import { useEffect, useRef } from "react";
-import { TeaserReel } from "@/components/hero/TeaserReel";
+import { SampleTrailer } from "./SampleTrailer";
 
 /** Normalized beam triangle: apex in the lot, wide end at the screen. */
 const APEX = { x: 0.6, y: 1 };
@@ -108,9 +108,11 @@ export function BigScreen() {
 
       {/* The screen itself: a plain panel in a dark frame, lit only by the projector. */}
       <div className="relative bg-[#0f0f12] p-[0.9%] ring-1 ring-white/5 shadow-[0_0_90px_rgb(220_230_255/0.12)]">
-        <TeaserReel variant="screen" />
+        <SampleTrailer />
       </div>
-      <p className="mt-2 text-right font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-faint">On screen: a sample run for a made-up app</p>
+      <p className="mt-2 text-right font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-faint">
+        On screen: a real trailer Premiere made of fundable.vibestarter.xyz from its link alone
+      </p>
       {/* Support posts */}
       <div aria-hidden className="mx-auto flex w-[78%] justify-between">
         {[0, 1, 2].map((i) => (

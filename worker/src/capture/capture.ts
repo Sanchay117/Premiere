@@ -38,6 +38,8 @@ export interface CaptureOptions {
   maxScreenshots?: number;
   navTimeoutMs?: number;
   totalTimeoutMs?: number;
+  /** Human-readable progress, shown live on the job page. */
+  onProgress?: (detail: string) => void;
 }
 
 interface Extracted {
@@ -101,6 +103,7 @@ function navigationError(err: unknown): CaptureError {
 }
 
 async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<CaptureOptions>): Promise<Capture> {
+  const progress = options.onProgress;
   const context = await newSafeContext(browser, { viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page = await context.newPage();
   context.on("page", (popup) => {
@@ -114,6 +117,7 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
   const warnings: string[] = [];
 
   let status = 0;
+  progress(`Opening ${url.hostname}`);
   try {
     const response = await page.goto(url.href, { waitUntil: "domcontentloaded", timeout: options.navTimeoutMs });
     status = response?.status() ?? 0;
@@ -134,15 +138,19 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
   }
   if (status >= 400) warnings.push(`The page answered with HTTP ${status}.`);
 
+  progress("Clearing cookie banners and popups");
   const cookieNote = await dismissCookieBanners(page);
   if (cookieNote) notes.push(cookieNote);
   await page.keyboard.press("Escape").catch(() => {});
 
+  progress("Scrolling through the page");
   await scrollThrough(page);
   const lateCookieNote = await dismissCookieBanners(page);
   if (lateCookieNote) notes.push(lateCookieNote);
 
+  progress("Mapping buttons, links and sections");
   const extracted = (await page.evaluate(inpageScript("extract", { maxElements: options.maxElements }))) as Extracted;
+  progress(`Found ${extracted.elements.length} things to click and ${extracted.sections.length} sections`);
 
   const botWall = BOT_WALL.test(`${extracted.title} ${extracted.textExcerpt.slice(0, 300)}`);
   if (botWall) warnings.push("The site showed a bot check or access-denied page instead of the app.");
@@ -159,6 +167,7 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
     await page.waitForTimeout(350);
 
     const n = screenshots.length + 1;
+    progress(`Taking screenshot ${n} of ${positions.length}`);
     const file = `shot-${n}.jpg`;
     const markedFile = `shot-${n}-marked.jpg`;
     const clean = await page.screenshot({ type: "jpeg", quality: 85 });
@@ -214,6 +223,7 @@ export async function capturePage(rawUrl: string, opts: CaptureOptions): Promise
     maxScreenshots: 4,
     navTimeoutMs: 20_000,
     totalTimeoutMs: 60_000,
+    onProgress: () => {},
     ...opts,
   };
   const url = await assertPublicUrl(rawUrl);

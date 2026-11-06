@@ -9,6 +9,7 @@
     "plan": "tsx src/cli/plan.ts",
     "bakeoff": "tsx src/cli/bakeoff.ts",
     "spend": "tsx src/cli/spend.ts",
+    "serve": "tsx src/server/index.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },

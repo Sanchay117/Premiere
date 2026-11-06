@@ -21,16 +21,19 @@ export async function readCapture(dir: string): Promise<Capture | null> {
 /** Reuses the saved capture for this URL unless `fresh` is set. */
 export async function loadOrCapture(
   rawUrl: string,
-  { fresh = false }: { fresh?: boolean } = {},
+  { fresh = false, onProgress }: { fresh?: boolean; onProgress?: (detail: string) => void } = {},
 ): Promise<StoredCapture & { cached: boolean }> {
   const url = normalizeUrl(rawUrl);
   const dir = captureDir(url);
   if (!fresh) {
     const saved = await readCapture(dir);
-    if (saved) return { capture: saved, dir, cached: true };
+    if (saved) {
+      onProgress?.("Using a saved capture of this page");
+      return { capture: saved, dir, cached: true };
+    }
   }
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
-  const capture = await capturePage(url.href, { outDir: dir });
+  const capture = await capturePage(url.href, { outDir: dir, onProgress });
   return { capture, dir, cached: false };
 }

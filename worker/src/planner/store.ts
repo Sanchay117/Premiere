@@ -3,7 +3,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { config, type Effort, type ModelId } from "../config";
+import { aliasOf, config, type Effort, type ModelId } from "../config";
 import type { Capture } from "../capture/types";
 import { urlSlug } from "../lib/url";
 import { PROMPT_VERSION } from "./prompt";
@@ -16,11 +16,14 @@ export interface SavedPlan {
   model: ModelId | null;
   effort: Effort | null;
   promptVersion: number;
+  /** The capture the plan was made from; element ids only hold for that capture. */
+  capturedAt: string;
   plan: Plan;
 }
 
 const slug = (c: Capture) => urlSlug(new URL(c.url));
-const cachePath = (c: Capture) => path.join(config.dataDir, "plans", `${slug(c)}.json`);
+/** One cached plan per URL and model, so comparing models never returns another model's plan. */
+const cachePath = (c: Capture, model: ModelId) => path.join(config.dataDir, "plans", `${slug(c)}-${aliasOf(model)}.json`);
 export const mockPath = (c: Capture) => path.join(config.fixturesDir, "plans", `${slug(c)}.json`);
 
 async function readSaved(file: string): Promise<SavedPlan | null> {
@@ -42,16 +45,25 @@ async function writeSaved(file: string, saved: SavedPlan): Promise<string> {
 type Meta = { source: string; model: ModelId | null; effort: Effort | null };
 
 function toSaved(c: Capture, plan: Plan, meta: Meta): SavedPlan {
-  return { url: c.url, savedAt: new Date().toISOString(), promptVersion: PROMPT_VERSION, ...meta, plan };
+  return {
+    url: c.url,
+    savedAt: new Date().toISOString(),
+    promptVersion: PROMPT_VERSION,
+    capturedAt: c.capturedAt,
+    ...meta,
+    plan,
+  };
 }
 
-export async function readCachedPlan(c: Capture): Promise<SavedPlan | null> {
-  const saved = await readSaved(cachePath(c));
-  return saved?.promptVersion === PROMPT_VERSION ? saved : null;
+/** A cached plan from this model, for this exact capture and prompt version. */
+export async function readCachedPlan(c: Capture, model: ModelId): Promise<SavedPlan | null> {
+  const saved = await readSaved(cachePath(c, model));
+  if (!saved || saved.promptVersion !== PROMPT_VERSION || saved.capturedAt !== c.capturedAt) return null;
+  return saved;
 }
 
-export function writeCachedPlan(c: Capture, plan: Plan, meta: Meta): Promise<string> {
-  return writeSaved(cachePath(c), toSaved(c, plan, meta));
+export function writeCachedPlan(c: Capture, plan: Plan, meta: Meta & { model: ModelId }): Promise<string> {
+  return writeSaved(cachePath(c, meta.model), toSaved(c, plan, meta));
 }
 
 export function readMockPlan(c: Capture): Promise<SavedPlan | null> {

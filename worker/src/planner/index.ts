@@ -51,7 +51,7 @@ export async function planTrailer(stored: StoredCapture, options: PlanOptions = 
   }
 
   if (!options.fresh) {
-    const cached = await readCachedPlan(capture);
+    const cached = await readCachedPlan(capture, model);
     if (cached) {
       const v = validatePlan(cached.plan, capture);
       if (v.usable) {

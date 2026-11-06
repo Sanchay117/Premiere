@@ -157,17 +157,28 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (!file) return send(res, 404, { error: "Not found" });
     const info = await stat(file).catch(() => null);
     if (!info) return send(res, 404, { error: "Not found" });
+    // A finished job's files can still be re-rendered (new thumbnails, a new caption look), so
+    // browsers check back every time and get a quick 304 while the file is unchanged.
+    const etag = `"${info.size.toString(36)}-${Math.floor(info.mtimeMs).toString(36)}"`;
     const headers: http.OutgoingHttpHeaders = {
       "content-type": CONTENT_TYPES[path.extname(name)] ?? "application/octet-stream",
       "accept-ranges": "bytes",
-      "cache-control": "private, max-age=3600",
+      "cache-control": "private, no-cache",
+      etag,
+      "last-modified": info.mtime.toUTCString(),
     };
     if (new URL(req.url ?? "/", "http://worker").searchParams.has("download")) {
       headers["content-disposition"] = `attachment; filename="${name}"`;
     }
-    // Byte ranges, so the video player can seek.
+    if (req.headers["if-none-match"]?.split(/\s*,\s*/).includes(etag)) {
+      res.writeHead(304, headers).end();
+      return;
+    }
+    // Byte ranges, so the video player can seek. A range for an older copy of the file (If-Range
+    // names another version) gets the whole new file instead.
     const range = req.headers.range?.match(/^bytes=(\d*)-(\d*)$/);
-    if (range && (range[1] || range[2])) {
+    const ifRange = req.headers["if-range"];
+    if (range && (range[1] || range[2]) && (!ifRange || ifRange === etag)) {
       const start = range[1] ? Number(range[1]) : Math.max(0, info.size - Number(range[2]));
       const end = range[1] && range[2] ? Math.min(Number(range[2]), info.size - 1) : info.size - 1;
       if (start > end || start >= info.size) {

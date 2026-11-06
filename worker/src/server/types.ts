@@ -55,6 +55,8 @@ export interface JobResultView {
     shotsSkipped: { index: number; reason: string }[];
     /** The narrator who read it, for example Atlas. */
     narrator: string;
+    /** What went differently from the order (no narrator, a simpler reshoot). */
+    notes?: string[];
   } | null;
 }
 

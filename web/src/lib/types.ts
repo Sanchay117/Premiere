@@ -85,6 +85,8 @@ export interface JobResultView {
     shotsFilmed: number;
     shotsSkipped: { index: number; reason: string }[];
     narrator?: string;
+    /** What went differently from the order (no narrator, a simpler reshoot). */
+    notes?: string[];
   } | null;
 }
 

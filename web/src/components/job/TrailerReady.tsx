@@ -150,6 +150,11 @@ export function TrailerReady({ job }: { job: JobView }) {
         {Math.round(trailer.duration)} s · {trailer.shotsFilmed} shots filmed
         {trailer.shotsSkipped.length > 0 && ` · ${trailer.shotsSkipped.length} skipped (never faked)`}
       </p>
+      {trailer.notes?.map((note) => (
+        <p key={note} className="mt-1.5 font-mono text-xs text-amber/80">
+          {note}
+        </p>
+      ))}
     </motion.section>
   );
 }

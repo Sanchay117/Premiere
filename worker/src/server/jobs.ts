@@ -281,7 +281,10 @@ async function run(job: Job): Promise<void> {
       shotsFilmed: trailer.shotsFilmed,
       shotsSkipped: trailer.shotsSkipped,
       narrator: trailer.voice,
+      notes: trailer.notes,
     };
+    // After a reshoot the storyboard shows the shots that were actually filmed.
+    job.result.plan = trailer.plan;
     job.status = "done";
     touch(job);
   } catch (err) {

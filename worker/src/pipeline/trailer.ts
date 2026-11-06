@@ -10,13 +10,15 @@ import { writeWav } from "../audio/wav";
 import type { StoredCapture } from "../capture/types";
 import { hostLabel } from "../lib/url";
 import { NARRATORS, narratorFor, type CaptionStyle, type TrailerOptions } from "../options";
+import { fallbackPlan } from "../planner/fallback";
 import type { Plan } from "../planner/schema";
-import { closeStage, openStage, recordPlan } from "../record/recorder";
+import { validatePlan } from "../planner/validate";
+import { openStage, recordPlan } from "../record/recorder";
 import { renderThumbnails, renderTrailer, type RenderOutputs } from "../render/render";
 import { chooseThumbnail } from "../render/thumbnail";
 import { buildTimeline, FPS, shotHolds, toSrt, type Timeline } from "../render/timeline";
 import type { ThumbnailProps, TrailerProps, TrailerSegment } from "../render/remotion/types";
-import { voicePlan, type VoiceLine } from "../voice/deepgram";
+import { silentLines, voicePlan, type VoiceLine } from "../voice/deepgram";
 
 export type TrailerStep = "voice" | "record" | "render";
 
@@ -77,8 +79,12 @@ export interface TrailerResult {
   duration: number;
   shotsFilmed: number;
   shotsSkipped: { index: number; reason: string }[];
-  /** The narrator's name, for example Atlas. */
+  /** The narrator's name, for example Atlas, or "Captions only" when the voice service failed. */
   voice: string;
+  /** The plan that was filmed: the one passed in, or the plainer no-AI tour when none of its shots worked. */
+  plan: Plan;
+  /** What went differently from the order, for the screening room. */
+  notes: string[];
 }
 
 const toFrames = (seconds: number) => Math.round(seconds * FPS);
@@ -116,51 +122,61 @@ export async function makeTrailer(
 ): Promise<TrailerResult> {
   await mkdir(jobDir, { recursive: true });
   const { capture } = stored;
+  const notes: string[] = [];
 
   // Voice, while the app opens for the shoot in the background: the browser launch, page load
   // and the app's own boot happen during the narration instead of after it.
   hooks.onStepStart?.("voice", "The narrator is reading the script");
   const stage = openStage(capture);
   stage.catch(() => {}); // the recorder awaits it, and a failure surfaces there
-  const narrator = NARRATORS[narratorFor(options.voice, plan.mood)];
-  let lines: VoiceLine[];
-  try {
-    lines = await voicePlan(plan, options.voice, (d) => hooks.onStepProgress?.("voice", d));
-  } catch (err) {
-    await closeStage(stage);
-    throw err;
-  }
-  const totalVoice = lines.reduce((a, l) => a + l.duration, 0);
-  hooks.onStepDone?.("voice", `${narrator.name} read ${lines.length} lines, ${totalVoice.toFixed(1)} s of narration`);
+  let shotPlan = plan;
+  let voiced = await voiceOrCaptions(shotPlan, options, (d) => hooks.onStepProgress?.("voice", d));
+  hooks.onStepDone?.("voice", voiceDetail(voiced, narratorName(shotPlan, options)));
 
   // Shoot
   hooks.onStepStart?.("record", "Opening the app for the shoot");
-  const recording = await recordPlan(capture, plan, {
-    holds: shotHolds(lines, plan, options.style),
+  const onRecordProgress = (d: string) => hooks.onStepProgress?.("record", d);
+  let recording = await recordPlan(capture, shotPlan, {
+    holds: shotHolds(voiced.lines, shotPlan, options.style),
     outDir: jobDir,
-    onProgress: (d) => hooks.onStepProgress?.("record", d),
+    onProgress: onRecordProgress,
     stage,
   });
-  const timeline = buildTimeline(lines, plan, recording, options.style);
-  const filmed = timeline.segments.filter((s) => s.kind === "shot").length;
+  let timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style);
+  let filmed = timeline.segments.filter((s) => s.kind === "shot").length;
+  if (filmed === 0) {
+    // None of the planned shots worked, usually because the page changed after it was mapped. A
+    // plainer tour from the same capture (holding on the page, scrolling through its sections)
+    // almost never fails, so the person still gets a trailer of their app. The plan's name,
+    // tagline, hook, close and gallery judgment describe the page, not the shots, so they stay.
+    onRecordProgress("None of the planned shots worked; filming a simpler tour of the page");
+    shotPlan = { ...plan, shots: validatePlan(fallbackPlan(capture), capture, options.style).plan.shots };
+    voiced = voiced.narrated ? await voiceOrCaptions(shotPlan, options, onRecordProgress) : { lines: silentLines(shotPlan), narrated: false };
+    recording = await recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style), outDir: jobDir, onProgress: onRecordProgress });
+    timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style);
+    filmed = timeline.segments.filter((s) => s.kind === "shot").length;
+    notes.push("None of the planned shots could be filmed, so this is a simpler tour of the page.");
+  }
   if (filmed === 0) throw new Error("None of the shots could be filmed on this page.");
+  if (!voiced.narrated) notes.unshift("The narrator could not be reached, so this trailer has captions and music only.");
   hooks.onStepDone?.(
     "record",
-    `${filmed} of ${plan.shots.length} shots filmed${timeline.skipped.length ? `, ${timeline.skipped.length} skipped` : ""}`,
+    `${filmed} of ${shotPlan.shots.length} shots filmed${timeline.skipped.length ? `, ${timeline.skipped.length} skipped` : ""}`,
   );
 
   // Sound and cut
   hooks.onStepStart?.("render", "Scoring and mixing the soundtrack");
-  const score = synthScore(timeline.duration, plan.mood, {
+  const score = synthScore(timeline.duration, shotPlan.mood, {
     titleEnd: timeline.titleEnd,
     endStart: timeline.endStart,
     clicks: timeline.clicks,
     hits: timeline.hits,
     hype: options.style === "hype",
   });
+  // With no narrator there is nothing to duck the music under.
   const mix = mixSoundtrack(
     timeline.duration,
-    timeline.segments.map((s) => ({ pcm: s.line.pcm, at: s.voiceAt })),
+    voiced.narrated ? timeline.segments.map((s) => ({ pcm: s.line.pcm, at: s.voiceAt })) : [],
     score,
   );
   const raw = path.join(jobDir, "soundtrack-raw.wav");
@@ -168,7 +184,7 @@ export async function makeTrailer(
   await normalizeLoudness(raw, path.join(jobDir, "soundtrack.wav"));
 
   hooks.onStepProgress?.("render", "Cutting the trailer");
-  const app = { name: plan.appName, tagline: plan.tagline, cta: plan.cta, host: hostLabel(capture.finalUrl) };
+  const app = { name: shotPlan.appName, tagline: shotPlan.tagline, cta: shotPlan.cta, host: hostLabel(capture.finalUrl) };
   const segments = trailerSegments(timeline);
   const durationInFrames = segments.reduce((a, s) => a + s.frames, 0);
   const trailer: EditFile["trailer"] = {
@@ -179,7 +195,8 @@ export async function makeTrailer(
     frames: recording.frames,
     soundtrack: "soundtrack.wav",
     style: options.style,
-    captions: options.captions,
+    // Without a narrator the captions carry the script, so they cannot be switched off.
+    captions: !voiced.narrated && options.captions === "off" ? "boxed" : options.captions,
   };
 
   // The edit is saved before rendering, so a failed or restyled render can be redone from it.
@@ -208,6 +225,35 @@ export async function makeTrailer(
     duration: timeline.duration,
     shotsFilmed: filmed,
     shotsSkipped: timeline.skipped,
-    voice: narrator.name,
+    voice: voiced.narrated ? narratorName(shotPlan, options) : "Captions only",
+    plan: shotPlan,
+    notes,
   };
+}
+
+const narratorName = (plan: Plan, options: TrailerOptions) => NARRATORS[narratorFor(options.voice, plan.mood)].name;
+
+interface Voiced {
+  lines: VoiceLine[];
+  /** False when the voice service failed and the lines are captions only. */
+  narrated: boolean;
+}
+
+/** Voices the plan; if the voice service cannot be reached (an outage, a spent account, no key),
+ *  the lines become captions timed for reading, so the trailer still ships with music. The
+ *  service's error goes to the worker's log, not the page. */
+async function voiceOrCaptions(plan: Plan, options: TrailerOptions, onProgress: (detail: string) => void): Promise<Voiced> {
+  try {
+    return { lines: await voicePlan(plan, options.voice, onProgress), narrated: true };
+  } catch (err) {
+    console.error(`narration failed, making a captions-only trailer: ${err instanceof Error ? err.message : String(err)}`);
+    return { lines: silentLines(plan), narrated: false };
+  }
+}
+
+function voiceDetail(voiced: Voiced, narrator: string): string {
+  const seconds = voiced.lines.reduce((a, l) => a + l.duration, 0).toFixed(1);
+  return voiced.narrated
+    ? `${narrator} read ${voiced.lines.length} lines, ${seconds} s of narration`
+    : `The narrator could not be reached, so the ${voiced.lines.length} lines go on as captions`;
 }

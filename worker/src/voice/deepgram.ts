@@ -156,15 +156,40 @@ export function alignWords(text: string, transcript: DeepgramWord[], duration: n
 }
 
 /** Voices every narration line of a plan: hook, each shot, close. */
-export async function voicePlan(plan: Plan, voice: VoiceChoice, onProgress?: (detail: string) => void): Promise<VoiceLine[]> {
-  const key = config.deepgramKey;
-  if (!key) throw new VoiceError("DEEPGRAM_KEY is not set in .env");
-  const model = NARRATORS[narratorFor(voice, plan.mood)].model;
-  const lines = [
+/** The lines a plan is read in: the hook, one per shot, and the close. */
+function scriptLines(plan: Plan): { key: string; text: string }[] {
+  return [
     { key: "hook", text: plan.hook },
     ...plan.shots.map((s, i) => ({ key: `shot-${i + 1}`, text: s.narration })),
     { key: "close", text: plan.close },
   ];
+}
+
+/** Seconds a caption needs on screen to be read, at about two and a half words a second. */
+export const readingTime = (text: string) => Math.max(1.8, 0.6 + 0.4 * text.split(/\s+/).filter(Boolean).length);
+
+/** The script without a narrator: each line held as long as it takes to read as a caption, with
+ *  evenly spread word timings and no sound. For when the voice service cannot be reached, so the
+ *  trailer still ships with captions and music. */
+export function silentLines(plan: Plan): VoiceLine[] {
+  return scriptLines(plan).map(({ key, text }) => {
+    const duration = readingTime(text);
+    return {
+      key,
+      text,
+      pcm: { sampleRate: 48000, channels: [new Float32Array(1)] },
+      duration,
+      words: estimateWords(text, 0.15, duration - 0.15),
+      timing: "estimate" as const,
+    };
+  });
+}
+
+export async function voicePlan(plan: Plan, voice: VoiceChoice, onProgress?: (detail: string) => void): Promise<VoiceLine[]> {
+  const key = config.deepgramKey;
+  if (!key) throw new VoiceError("DEEPGRAM_KEY is not set in .env");
+  const model = NARRATORS[narratorFor(voice, plan.mood)].model;
+  const lines = scriptLines(plan);
   // Deepgram allows 15 Aura-2 requests at once per project. Five lines at a time voices a whole
   // script in about two rounds and leaves room for anything else using the key.
   const results: VoiceLine[] = new Array(lines.length);

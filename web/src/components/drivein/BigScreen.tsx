@@ -112,7 +112,7 @@ export function BigScreen() {
         <SampleTrailer />
       </div>
       <p className="mt-2 text-balance font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-faint lg:text-right">
-        On screen: a real trailer Premiere made of fundable.vibestarter.xyz from its link alone
+        On screen: a real trailer Premiere made of squoosh.app from its link alone
       </p>
       {/* Support posts */}
       <div aria-hidden className="mx-auto flex w-[78%] justify-between">

@@ -1,14 +1,15 @@
 "use client";
 
-// The big screen's feature: a real trailer Premiere made of Fundable, Vibestarter's fundability
-// scorer, from nothing but its link (job 2f64e7e4, re-encoded to 720p for the page). It plays muted
-// and on a loop, like a drive-in screen seen from the road; the sound button starts it over with
-// the speaker on. With reduced motion it waits on its poster until asked.
+// The big screen's feature: a real trailer Premiere made of Squoosh, Google's open-source image
+// compressor, from nothing but its link: the agent picks a sample photo and films the side-by-side
+// editor it opens, narrated by Pandora (job fdf592a3, re-encoded to 720p for the page). It plays
+// muted and on a loop, like a drive-in screen seen from the road; the sound button starts it over
+// with the speaker on. With reduced motion it waits on its poster until asked.
 
 import { useEffect, useRef, useState } from "react";
 
-const SRC = "/sample/fundable-trailer.mp4";
-const POSTER = "/sample/fundable-poster.jpg";
+const SRC = "/sample/squoosh-trailer.mp4";
+const POSTER = "/sample/squoosh-poster.jpg";
 
 function SpeakerIcon({ on }: { on: boolean }) {
   return (
@@ -59,7 +60,7 @@ export function SampleTrailer() {
         muted
         playsInline
         preload="metadata"
-        aria-label="A launch trailer Premiere made of Fundable from its link alone"
+        aria-label="A launch trailer Premiere made of Squoosh from its link alone"
         className="block h-full w-full object-cover"
       />
       <button

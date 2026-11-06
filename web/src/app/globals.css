@@ -1,0 +1,247 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #07080c;
+  --color-ink-2: #0c0e15;
+  --color-ink-3: #141826;
+  --color-line: rgb(243 234 216 / 0.12);
+  --color-line-strong: rgb(243 234 216 / 0.22);
+  --color-cream: #f3ead8;
+  --color-cream-dim: rgb(243 234 216 / 0.64);
+  --color-cream-faint: rgb(243 234 216 / 0.38);
+  --color-amber: #ffb547;
+  --color-amber-deep: #ff8a3d;
+  --color-rec: #ff5148;
+  --color-mark: #e11d74;
+  --color-sky: #6fb6ff;
+
+  --font-serif: var(--font-instrument), ui-serif, Georgia, serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, Menlo, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-ink);
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-cream);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-amber);
+  color: var(--color-ink);
+}
+
+/* Small uppercase labels, like slate and timecode text. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-cream-dim);
+}
+
+/* Film grain over everything. */
+.grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  overflow: hidden;
+}
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: -100%;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 0.075;
+  animation: grain 7s steps(9) infinite;
+}
+@keyframes grain {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-5%, -8%); }
+  20% { transform: translate(-12%, 4%); }
+  30% { transform: translate(6%, -14%); }
+  40% { transform: translate(-4%, 18%); }
+  50% { transform: translate(-14%, 8%); }
+  60% { transform: translate(12%, 0); }
+  70% { transform: translate(0, 12%); }
+  80% { transform: translate(4%, 26%); }
+  90% { transform: translate(-8%, 8%); }
+}
+
+/* Uneven projector flicker. */
+.flicker {
+  animation: flicker 5.5s infinite;
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  7% { opacity: 0.86; }
+  8% { opacity: 1; }
+  41% { opacity: 0.93; }
+  42% { opacity: 1; }
+  63% { opacity: 0.8; }
+  64% { opacity: 0.97; }
+  65% { opacity: 1; }
+}
+
+/* A beam of light passing across italic display words. */
+.sweep {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-amber) 0%,
+    var(--color-amber) 38%,
+    #fff3d6 48%,
+    var(--color-amber) 58%,
+    var(--color-amber-deep) 100%
+  );
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sweep 5s ease-in-out infinite;
+}
+@keyframes sweep {
+  0% { background-position: 100% 0; }
+  55%, 100% { background-position: 0% 0; }
+}
+
+.marquee-track {
+  animation: marquee 38s linear infinite;
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.rec-dot {
+  animation: rec 1.2s ease-in-out infinite;
+}
+@keyframes rec {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.caret {
+  animation: caret 1s steps(1) infinite;
+}
+@keyframes caret {
+  50% { opacity: 0; }
+}
+
+/* Sprocket holes for film strip edges. */
+.sprockets {
+  background-image: radial-gradient(circle at 50% 50%, var(--color-ink) 0 3px, transparent 3.5px),
+    linear-gradient(var(--color-ink-3), var(--color-ink-3));
+  background-size: 18px 100%, 100% 100%;
+  background-repeat: repeat-x, no-repeat;
+}
+
+/* Film-leader intro: shown only when the inline script in <head> sets data-leader="play". */
+.leader {
+  display: none;
+}
+html[data-leader="play"] .leader {
+  display: flex;
+}
+
+.leader-sweep {
+  animation: leader-sweep 330ms linear infinite;
+}
+@keyframes leader-sweep {
+  to { transform: rotate(360deg); }
+}
+
+/* Ticket stubs: semicircle notches cut into both sides. */
+.ticket {
+  -webkit-mask:
+    radial-gradient(circle 8px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 8px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 8px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 8px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
+}
+
+/* Outlined numerals for the story section. */
+.outline-text {
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(243 234 216 / 0.22);
+}
+
+/* Night sky. */
+.twinkle {
+  animation-name: twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.95; }
+  50% { opacity: 0.2; }
+}
+.shooting-star {
+  opacity: 0;
+  animation: shoot 11s ease-in 4s infinite;
+}
+@keyframes shoot {
+  0% { opacity: 0; transform: translate(0, 0) rotate(18deg); }
+  1.5% { opacity: 1; }
+  6% { opacity: 0; transform: translate(460px, 150px) rotate(18deg); }
+  100% { opacity: 0; transform: translate(460px, 150px) rotate(18deg); }
+}
+
+/* Mouse parallax layers; --px and --py run from -1 to 1. */
+.parallax-far,
+.parallax-mid,
+.parallax-near {
+  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.parallax-far { transform: translate3d(calc(var(--px, 0) * -5px), calc(var(--py, 0) * -3px), 0); }
+.parallax-mid { transform: translate3d(calc(var(--px, 0) * -12px), calc(var(--py, 0) * -6px), 0); }
+.parallax-near { transform: translate3d(calc(var(--px, 0) * -22px), calc(var(--py, 0) * -8px), 0); }
+
+/* Marquee bulbs chase in threes. */
+.bulb {
+  background: #ffd38a;
+  box-shadow: 0 0 8px 2px rgb(255 190 90 / 0.75);
+  animation: bulb 1.2s steps(1) infinite;
+}
+@keyframes bulb {
+  0%, 100% { background: #ffd38a; box-shadow: 0 0 8px 2px rgb(255 190 90 / 0.75); }
+  66% { background: #4a3210; box-shadow: none; }
+}
+
+/* End credits roll. */
+.credits-roll {
+  animation: credits 40s linear infinite;
+}
+@keyframes credits {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-100% - var(--roll-h, 460px))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twinkle,
+  .shooting-star,
+  .bulb,
+  .credits-roll,
+  .grain::before,
+  .flicker,
+  .sweep,
+  .marquee-track,
+  .rec-dot,
+  .caret {
+    animation: none !important;
+  }
+  .sweep {
+    background-position: 30% 0;
+  }
+}

@@ -11,6 +11,7 @@ worker/.data/
 
 # Builds
 .next/
+next-env.d.ts
 out/
 dist/
 .vercel/

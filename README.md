@@ -30,10 +30,10 @@ Trailers are free until 16 Nov 2026, within daily limits. After that a trailer c
 
 One job runs six steps, and Claude is called exactly once.
 
-1. **Capture.** A locked-down Playwright browser opens the URL at 1920×1080, clears cookie banners, waits for the app to finish drawing, and maps every button, link and section, with screenshots. It never signs in: behind a login wall it stays on the public pages.
+1. **Capture.** A locked-down Playwright browser opens the URL at 1920×1080, clears cookie banners, waits for the app to finish drawing, and maps every button, link and section, with screenshots. It never signs in: behind a login wall it stays on the public pages. A site that answers with a bot check gets a clear refusal rather than a trailer of the check.
 2. **Script.** One call to Claude Opus 5.5 reads the screenshots and the page map and returns a shot list as structured JSON: what to click, hover, type or scroll to, one line of narration per shot, a punch title for each, and a judgment on whether the page is fit for the public gallery. There is no agent loop. The plan is validated (unknown elements, external links, destructive clicks and typing into sensitive fields are dropped), and if Claude is unavailable or over budget, a planner with no AI writes the script from the page's own words.
-3. **Voice.** Deepgram Aura-2 reads each line, and Deepgram nova-3 transcribes it back so every word gets a timestamp for the captions. The browser for the shoot is already opening the app meanwhile.
-4. **Shoot.** The browser replays the shot list and films it through the Chrome DevTools screencast, each shot exactly as long as its line. Every step has a timeout. A step that fails is cut from the edit, never faked.
+3. **Voice.** Deepgram Aura-2 reads each line, and Deepgram nova-3 transcribes it back so every word gets a timestamp for the captions. The browser for the shoot is already opening the app meanwhile. If the voice service is down, the trailer still ships, with captions and music.
+4. **Shoot.** The browser replays the shot list and films it through the Chrome DevTools screencast, each shot exactly as long as its line. Every step has a timeout. A step that fails is cut from the edit, never faked, and if no planned shot works at all, Premiere reshoots a simpler tour of the page.
 5. **Sound.** A score synthesized in code to the plan's mood, with hits on the titles and ticks on the clicks, ducked under the narration and mastered with ffmpeg.
 6. **Cut.** Remotion renders the trailer: a virtual camera that eases toward each click, a spotlight on the thing being used, a drawn cursor (headless browsers record none), captions in the chosen look, an end card with your URL, and the two thumbnails.
 
@@ -73,7 +73,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Then open http://localhost:3000. In `.env`, `DEEPGRAM_KEY` gives the trailers a narrator, and `PREMIERE_ANTHROPIC_API_KEY` lets Claude write the scripts (without it the no-AI planner does). `.env.example` explains every setting.
+Then open http://localhost:3000. In `.env`, `DEEPGRAM_KEY` gives the trailers a narrator (without it they come out with captions and music only), and `PREMIERE_ANTHROPIC_API_KEY` lets Claude write the scripts (without it the no-AI planner does). `.env.example` explains every setting.
 
 From the command line:
 

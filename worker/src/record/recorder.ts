@@ -9,6 +9,7 @@ import type { BrowserContext, Locator, Page } from "playwright";
 import { waitForContent } from "../capture/capture";
 import { dismissCookieBanners } from "../capture/cookies";
 import type { Capture, CapturedElement } from "../capture/types";
+import { DESTRUCTIVE_TEXT, LOGIN_TEXT } from "../planner/fallback";
 import type { Plan, Shot } from "../planner/schema";
 import { launchSafeBrowser, newSafeContext, type SafeBrowser } from "../safety/browser";
 import { assertPublicUrl } from "../safety/url-guard";
@@ -95,7 +96,7 @@ export async function closeOverlays(page: Page): Promise<void> {
 }
 
 /** Finds a captured element again on the live page, checking it still says the same thing. */
-async function locate(page: Page, el: CapturedElement): Promise<Locator | null> {
+export async function locate(page: Page, el: CapturedElement): Promise<Locator | null> {
   const name = el.text.slice(0, 60);
   const bySelector = page.locator(el.selector).first();
   if (await bySelector.isVisible().catch(() => false)) {
@@ -114,6 +115,42 @@ async function locate(page: Page, el: CapturedElement): Promise<Locator | null> 
   candidates.push(page.getByText(name, { exact: false }).first());
   for (const candidate of candidates) {
     if (await candidate.isVisible().catch(() => false)) return candidate;
+  }
+  return null;
+}
+
+/** Menu and disclosure triggers that may hide a target: popup buttons, collapsed toggles and
+ *  closed <details>. */
+const TRIGGERS = '[aria-haspopup]:not([aria-haspopup="false"]), [aria-expanded="false"], details:not([open]) > summary';
+/** Triggers that lead to credential forms or undo someone's work are never opened. */
+const RISKY_TRIGGER = new RegExp(`${LOGIN_TEXT.source}|${DESTRUCTIVE_TEXT.source}`, "i");
+
+/**
+ * A planned target can sit in a menu or panel that is shut when its shot comes up: Excalidraw's
+ * "Live collaboration..." is on the welcome screen at capture time, which closes once earlier
+ * shots pick tools, and from then on lives in the main menu. Try the page's menu triggers one at
+ * a time, at most four, keeping the first that brings the target into view and closing each
+ * miss again. This runs during setup, off camera; the shot then opens on the menu and films the
+ * click inside it.
+ */
+export async function reveal(page: Page, el: CapturedElement): Promise<Locator | null> {
+  const triggers = page.locator(TRIGGERS);
+  const count = Math.min(await triggers.count().catch(() => 0), 16);
+  let tried = 0;
+  for (let i = 0; i < count && tried < 4; i++) {
+    const trigger = triggers.nth(i);
+    if (!(await trigger.isVisible().catch(() => false))) continue;
+    const label = await trigger
+      .evaluate((node) => (node as HTMLElement).innerText || node.getAttribute("aria-label") || node.getAttribute("title") || "")
+      .catch(() => "");
+    if (RISKY_TRIGGER.test(label)) continue;
+    tried++;
+    await trigger.click({ timeout: 1500 }).catch(() => {});
+    await sleep(350);
+    const found = await locate(page, el);
+    if (found) return found;
+    await page.keyboard.press("Escape").catch(() => {});
+    await sleep(200);
   }
   return null;
 }
@@ -281,6 +318,12 @@ export async function recordPlan(capture: Capture, plan: Plan, options: RecordOp
           await settle(p);
           await dismissCookieBanners(p);
           locator = await locate(p, el);
+        }
+        // A target can draw late (Poolsuite's radio boots slowly) or sit in a menu that is shut
+        // by now; both get a second chance here, off camera.
+        if (!locator) {
+          await sleep(700);
+          locator = (await locate(p, el)) ?? (await reveal(p, el));
         }
         if (!locator) error = `could not find "${el.text}"`;
         else if (shot.action !== "scroll") {

@@ -4,20 +4,23 @@ import { Countdown } from "@/components/intro";
 import { Access } from "@/components/sections/Access";
 import { Credits } from "@/components/sections/Credits";
 import { FinalCta } from "@/components/sections/FinalCta";
+import { Gallery } from "@/components/sections/Gallery";
 import { Intermission } from "@/components/sections/Intermission";
-import { Marquee } from "@/components/sections/Marquee";
 import { Program } from "@/components/sections/Program";
 import { Reels } from "@/components/sections/Reels";
+import type { GalleryEntry } from "@/lib/types";
+import { workerJson } from "@/lib/worker";
 
-export default function Home() {
+export default async function Home() {
+  const gallery = await workerJson<{ trailers: GalleryEntry[] }>("/gallery");
   return (
     <>
       <Countdown />
       <Nav />
       <main>
         <Hero />
-        <Marquee />
         <Program />
+        <Gallery entries={gallery?.trailers ?? []} />
         <Intermission />
         <Reels />
         <Access />

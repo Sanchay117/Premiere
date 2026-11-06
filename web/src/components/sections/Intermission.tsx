@@ -1,21 +1,12 @@
 "use client";
 
-// An old-fashioned intermission card that tells where the word "trailer" comes from.
-// Its little countdown starts when the card scrolls into view.
+// An intermission slide, projected the way drive-ins ran them between features: saturated color,
+// rounded corners from the slide mount, darker at the edges. It tells where the word "trailer"
+// comes from, and its countdown starts when the slide scrolls into view.
 
 import { useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Reveal } from "./Reveal";
-
-function Flourish({ className }: { className: string }) {
-  return (
-    <svg viewBox="0 0 60 60" className={`absolute size-12 text-amber/60 ${className}`} fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden>
-      <path d="M4 56 V22 Q4 4 22 4 H56" />
-      <path d="M12 56 V26 Q12 12 26 12 H56" opacity="0.5" />
-      <circle cx="22" cy="22" r="3" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 function ResumeTimer() {
   const ref = useRef<HTMLSpanElement>(null);
@@ -27,47 +18,43 @@ function ResumeTimer() {
     return () => clearInterval(id);
   }, [inView]);
   return (
-    <span ref={ref} className="tabular-nums text-amber">
-      {left > 0 ? `0:${String(left).padStart(2, "0")}` : "now. Back to your seats."}
+    <span ref={ref} className="tabular-nums text-[#ffd98a]">
+      {left > 0 ? `0:${String(left).padStart(2, "0")}` : "now. Back to your cars."}
     </span>
   );
 }
 
 export function Intermission() {
   return (
-    <section id="story" className="relative scroll-mt-24 py-24 md:py-32">
+    <section id="story" className="relative scroll-mt-24 py-20 md:py-28">
       <div className="mx-auto max-w-5xl px-5 md:px-8">
         <Reveal>
-          <div className="relative overflow-hidden rounded-[2rem] border border-amber/25 bg-[radial-gradient(ellipse_at_top,#2a1d0c,#0d0b09_65%)] px-7 py-14 text-center shadow-[0_0_120px_-40px_rgb(255_181_71/0.5)] md:px-16 md:py-20">
-            <Flourish className="left-5 top-5" />
-            <Flourish className="right-5 top-5 rotate-90" />
-            <Flourish className="bottom-5 right-5 rotate-180" />
-            <Flourish className="bottom-5 left-5 -rotate-90" />
-
-            <p className="font-mono text-xs uppercase tracking-[0.5em] text-amber">Intermission</p>
-            <h2 className="mt-6 font-serif text-[clamp(2.8rem,7.5vw,6.5rem)] italic leading-[0.95]">Why &ldquo;trailer&rdquo;?</h2>
-            <p className="mx-auto mt-8 max-w-2xl text-xl leading-relaxed text-cream/90">
-              New York, 1913. Early film ads were spliced onto the end of the reel, so they played after the feature.
-              They trailed it, and the name stuck.
+          <div className="relative overflow-hidden rounded-[2.2rem] bg-slide px-7 py-14 text-center shadow-[inset_0_0_140px_rgb(0_0_0/0.6),0_0_0_10px_#0b0b0d,0_0_90px_rgb(120_220_220/0.12)] md:px-16 md:py-16">
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,rgb(255_255_255/0.08),transparent_60%)]" />
+            <p className="relative font-script text-[clamp(3.6rem,10vw,7.4rem)] leading-[0.9] text-[#ffd98a] [text-shadow:0_4px_0_rgb(0_0_0/0.25)]">
+              Intermission
             </p>
-            <p className="mx-auto mt-5 max-w-2xl leading-relaxed text-cream-dim">
-              One of the earliest promoted a Broadway musical in Marcus Loew&apos;s theaters in November 1913. Studios
-              soon moved trailers to the front, where nobody could miss them.
+            <h2 className="relative mt-7 font-display text-[clamp(2.2rem,5vw,3.8rem)] leading-none tracking-[0.04em] text-cream">
+              WHY IS IT CALLED A TRAILER?
+            </h2>
+            <p className="relative mx-auto mt-6 max-w-2xl text-xl leading-relaxed text-cream/90">
+              New York, 1913. Early film ads were spliced onto the end of the reel, so they played after the feature. They trailed it, and
+              the name stuck.
+            </p>
+            <p className="relative mx-auto mt-4 max-w-2xl leading-relaxed text-cream/70">
+              One of the earliest promoted a Broadway musical in Marcus Loew&apos;s theaters in November 1913. Studios soon moved trailers to
+              the front, where nobody could miss them.
             </p>
 
-            <div className="mx-auto my-10 flex max-w-xs items-center gap-4" aria-hidden>
-              <span className="h-px flex-1 bg-amber/30" />
-              <span className="text-amber">✦</span>
-              <span className="h-px flex-1 bg-amber/30" />
-            </div>
+            <div aria-hidden className="relative mx-auto my-9 h-[3px] max-w-xs border-y border-[#ffd98a]/40" />
 
-            <h3 className="font-serif text-4xl md:text-5xl">Every launch needs one.</h3>
-            <p className="mx-auto mt-4 max-w-2xl leading-relaxed text-cream-dim">
-              A demo video for the launch post, the hackathon entry and the raise page. Most founders skip it or lose a day
-              making one. Premiere makes it from a link.
+            <h3 className="relative font-display text-[clamp(1.9rem,4vw,3rem)] leading-none tracking-[0.04em] text-[#ffd98a]">EVERY LAUNCH NEEDS ONE</h3>
+            <p className="relative mx-auto mt-4 max-w-2xl leading-relaxed text-cream/80">
+              A demo video for the launch post, the hackathon entry and the raise page. Most founders skip it or lose a day making one.
+              Premiere makes it from a link.
             </p>
-            <p className="mt-10 font-mono text-xs uppercase tracking-[0.25em] text-cream-faint">
-              The feature resumes in <ResumeTimer />
+            <p className="relative mt-9 font-mono text-[13px] font-bold uppercase tracking-[0.16em] text-cream/60">
+              The show resumes in <ResumeTimer />
             </p>
           </div>
         </Reveal>

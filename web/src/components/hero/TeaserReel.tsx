@@ -212,7 +212,7 @@ function PremiereScene() {
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_45%,#231a10,#08090d_68%)] text-center">
       <span className="font-mono text-[clamp(8px,0.95vw,11px)] uppercase tracking-[0.35em] text-cream-dim">Now showing</span>
       <motion.h3
-        className="mt-[2%] font-serif text-[clamp(30px,6.5vw,84px)] leading-none text-cream"
+        className="mt-[2%] font-display text-[clamp(34px,7.5vw,96px)] leading-none tracking-[0.03em] text-cream"
         initial={{ letterSpacing: "0.35em", opacity: 0 }}
         animate={{ letterSpacing: "0.01em", opacity: 1 }}
         transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
@@ -220,7 +220,7 @@ function PremiereScene() {
         Nightjar
       </motion.h3>
       <motion.p
-        className="sweep mt-[1.5%] font-serif text-[clamp(13px,2vw,26px)] italic"
+        className="mt-[1.5%] text-[clamp(12px,1.8vw,22px)] font-semibold text-amber"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6, duration: 0.8 }}

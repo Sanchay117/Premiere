@@ -1,21 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Bebas_Neue, Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Courier_Prime, League_Gothic, Libre_Franklin, Permanent_Marker, Yellowtail } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { IntroProvider } from "@/components/intro";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import "./globals.css";
 
-const serif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-instrument",
-  display: "swap",
-});
-const sans = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" });
-const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
-const marquee = Bebas_Neue({ subsets: ["latin"], weight: "400", variable: "--font-marquee", display: "swap" });
+const league = League_Gothic({ subsets: ["latin"], variable: "--font-league", display: "swap" });
+const yellowtail = Yellowtail({ subsets: ["latin"], weight: "400", variable: "--font-yellowtail", display: "swap" });
+const franklin = Libre_Franklin({ subsets: ["latin"], variable: "--font-franklin", display: "swap" });
+const courier = Courier_Prime({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-courier", display: "swap" });
+const marker = Permanent_Marker({ subsets: ["latin"], weight: "400", variable: "--font-marker-hand", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Premiere: paste a URL, get a launch trailer",
@@ -32,8 +27,9 @@ export const viewport: Viewport = {
 const leaderScript = `(function(){try{var d=document.documentElement;var seen=sessionStorage.getItem("premiere-leader");var reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;if(!seen&&!reduce&&location.pathname==="/"){d.dataset.leader="play";}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const fonts = [league, yellowtail, franklin, courier, marker].map((f) => f.variable).join(" ");
   return (
-    <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} ${marquee.variable}`} suppressHydrationWarning>
+    <html lang="en" className={fonts} suppressHydrationWarning>
       <body className="min-h-screen overflow-x-hidden">
         <Script id="premiere-leader" strategy="beforeInteractive">
           {leaderScript}

@@ -66,7 +66,7 @@ export function Countdown() {
         />
         <span
           key={n}
-          className="absolute inset-0 flex items-center justify-center font-serif text-[min(34vw,34vh)] leading-none text-cream"
+          className="absolute inset-0 flex items-center justify-center font-display text-[min(40vw,40vh)] leading-none text-cream"
         >
           {n}
         </span>

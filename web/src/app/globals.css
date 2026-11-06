@@ -7,17 +7,31 @@
   --color-line: rgb(243 234 216 / 0.12);
   --color-line-strong: rgb(243 234 216 / 0.22);
   --color-cream: #f3ead8;
-  --color-cream-dim: rgb(243 234 216 / 0.64);
-  --color-cream-faint: rgb(243 234 216 / 0.38);
+  --color-cream-dim: rgb(243 234 216 / 0.66);
+  --color-cream-faint: rgb(243 234 216 / 0.4);
   --color-amber: #ffb547;
   --color-amber-deep: #ff8a3d;
   --color-rec: #ff5148;
   --color-mark: #e11d74;
   --color-sky: #6fb6ff;
+  /* Printed things: ticket stock, the ink on it, and the red of a ticket roll. */
+  --color-paper: #efe3c6;
+  --color-paper-2: #e4d5b2;
+  --color-paper-ink: #241a10;
+  --color-paper-dim: rgb(36 26 16 / 0.62);
+  --color-ticket: #c8372d;
+  --color-ticket-deep: #a3291f;
+  /* An intermission slide, projected. */
+  --color-slide: #0f4a4f;
 
-  --font-serif: var(--font-instrument), ui-serif, Georgia, serif;
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, Menlo, monospace;
+  /* A condensed poster gothic for marquees, headlines and prices; a sign painter's script for the
+     name; a Franklin Gothic revival for reading; Courier for anything typed, as on a screenplay;
+     a marker for labels written on tape. */
+  --font-display: var(--font-league), "Oswald", Impact, sans-serif;
+  --font-script: var(--font-yellowtail), cursive;
+  --font-sans: var(--font-franklin), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-courier), ui-monospace, Menlo, monospace;
+  --font-marker: var(--font-marker-hand), cursive;
 }
 
 :root {
@@ -44,11 +58,12 @@ body {
   color: var(--color-ink);
 }
 
-/* Small uppercase labels, like slate and timecode text. */
+/* Typed labels, like the slate on a film can or the header of a screenplay page. */
 .eyebrow {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--color-cream-dim);
 }
@@ -56,6 +71,81 @@ body {
 /* Static grain for backgrounds that paint over the body (the night sky). Always behind text. */
 .grain-bg {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Paper stock: a warm sheet with fibres, painted as the element's own background (behind text). */
+.paper {
+  background-color: var(--color-paper);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.1  0 0 0 0.11 0'/></filter><rect width='100%' height='100%' filter='url(%23p)'/></svg>"),
+    radial-gradient(ellipse at 30% 20%, rgb(255 255 255 / 0.35), transparent 60%),
+    radial-gradient(ellipse at 80% 90%, rgb(120 90 40 / 0.14), transparent 55%);
+  color: var(--color-paper-ink);
+}
+
+/* A felt letter board: black grooves that white plastic letters slot into. */
+.letterboard {
+  background-color: #0d0d0f;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.035) 0px,
+    rgb(255 255 255 / 0.035) 1px,
+    transparent 1px,
+    transparent 7px,
+    rgb(0 0 0 / 0.55) 7px,
+    rgb(0 0 0 / 0.55) 8px
+  );
+}
+
+/* Black plastic letters on a lit marquee panel. */
+.marquee-panel {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--track, 3.2rem) - 3px), rgb(0 0 0 / 0.16) calc(var(--track, 3.2rem) - 3px) var(--track, 3.2rem)),
+    linear-gradient(to bottom, #fffaf0, #f2e7cf);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    inset 0 10px 30px rgb(255 255 255 / 0.6),
+    0 0 60px rgb(255 236 200 / 0.22),
+    0 0 160px rgb(255 214 150 / 0.12);
+}
+
+/* Neon tube lettering. */
+.neon {
+  color: #ffe3b0;
+  text-shadow:
+    0 0 2px #fff6e0,
+    0 0 8px rgb(255 181 71 / 0.95),
+    0 0 22px rgb(255 140 50 / 0.7),
+    0 0 48px rgb(255 120 40 / 0.45);
+}
+.neon-flicker {
+  animation: neon-flicker 7s infinite;
+}
+@keyframes neon-flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 1; }
+  42% { opacity: 0.55; }
+  43% { opacity: 1; }
+  44% { opacity: 0.7; }
+  45% { opacity: 1; }
+}
+
+/* Perforated tear line along the top or bottom edge of a ticket. */
+.perf-x {
+  background-image: radial-gradient(circle, var(--color-ink) 0 3px, transparent 3.5px);
+  background-size: 14px 8px;
+  background-repeat: repeat-x;
+  height: 8px;
+}
+
+/* Ticket stubs: semicircle notches cut into both sides. */
+.ticket {
+  -webkit-mask:
+    radial-gradient(circle 9px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 9px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 9px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 9px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
 }
 
 /* Uneven projector flicker. */
@@ -71,35 +161,6 @@ body {
   63% { opacity: 0.8; }
   64% { opacity: 0.97; }
   65% { opacity: 1; }
-}
-
-/* A beam of light passing across italic display words. */
-.sweep {
-  background-image: linear-gradient(
-    100deg,
-    var(--color-amber) 0%,
-    var(--color-amber) 38%,
-    #fff3d6 48%,
-    var(--color-amber) 58%,
-    var(--color-amber-deep) 100%
-  );
-  background-size: 260% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: sweep 5s ease-in-out infinite;
-}
-@keyframes sweep {
-  0% { background-position: 100% 0; }
-  55%, 100% { background-position: 0% 0; }
-}
-
-.marquee-track {
-  animation: marquee 38s linear infinite;
-}
-@keyframes marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
 }
 
 .rec-dot {
@@ -140,20 +201,18 @@ html[data-leader="play"] .leader {
   to { transform: rotate(360deg); }
 }
 
-/* Ticket stubs: semicircle notches cut into both sides. */
-.ticket {
-  -webkit-mask:
-    radial-gradient(circle 8px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
-    radial-gradient(circle 8px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
-  mask:
-    radial-gradient(circle 8px at 0 50%, #0000 98%, #000) left / 51% 100% no-repeat,
-    radial-gradient(circle 8px at 100% 50%, #0000 98%, #000) right / 51% 100% no-repeat;
+/* Entrances that need no JavaScript: content is visible even before the page hydrates. */
+.rise {
+  animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--delay, 0s);
 }
-
-/* Outlined numerals for the story section. */
-.outline-text {
-  color: transparent;
-  -webkit-text-stroke: 1px rgb(243 234 216 / 0.22);
+/* Hold the entrances while the film leader plays; they run when it irises out. */
+html[data-leader="play"] .rise {
+  animation-play-state: paused;
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* Night sky. */
@@ -165,16 +224,6 @@ html[data-leader="play"] .leader {
 @keyframes twinkle {
   0%, 100% { opacity: 0.95; }
   50% { opacity: 0.2; }
-}
-.shooting-star {
-  opacity: 0;
-  animation: shoot 11s ease-in 4s infinite;
-}
-@keyframes shoot {
-  0% { opacity: 0; transform: translate(0, 0) rotate(18deg); }
-  1.5% { opacity: 1; }
-  6% { opacity: 0; transform: translate(460px, 150px) rotate(18deg); }
-  100% { opacity: 0; transform: translate(460px, 150px) rotate(18deg); }
 }
 
 /* Mouse parallax layers; --px and --py run from -1 to 1. */
@@ -209,17 +258,18 @@ html[data-leader="play"] .leader {
 
 @media (prefers-reduced-motion: reduce) {
   .twinkle,
-  .shooting-star,
   .bulb,
   .credits-roll,
   .flicker,
-  .sweep,
-  .marquee-track,
+  .neon-flicker,
   .rec-dot,
-  .caret {
+  .caret,
+  .rise {
     animation: none !important;
   }
-  .sweep {
-    background-position: 30% 0;
+  .parallax-far,
+  .parallax-mid,
+  .parallax-near {
+    transform: none !important;
   }
 }

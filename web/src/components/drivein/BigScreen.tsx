@@ -106,10 +106,11 @@ export function BigScreen() {
         <BeamDust />
       </div>
 
-      {/* The screen itself. */}
-      <div className="relative bg-[#16130e] p-[1.1%] shadow-[0_0_70px_rgb(255_214_150/0.22),0_0_220px_rgb(255_181_71/0.14)]">
+      {/* The screen itself: a plain panel in a dark frame, lit only by the projector. */}
+      <div className="relative bg-[#0f0f12] p-[0.9%] ring-1 ring-white/5 shadow-[0_0_90px_rgb(220_230_255/0.12)]">
         <TeaserReel variant="screen" />
       </div>
+      <p className="mt-2 text-right font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-faint">On screen: a sample run for a made-up app</p>
       {/* Support posts */}
       <div aria-hidden className="mx-auto flex w-[78%] justify-between">
         {[0, 1, 2].map((i) => (

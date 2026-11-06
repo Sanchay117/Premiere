@@ -61,7 +61,7 @@ export function TrailerReady({ job }: { job: JobView }) {
                 <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>
-                <span className="block font-[family-name:var(--font-marquee)] text-xl leading-none tracking-[0.04em] text-cream group-hover:text-amber">
+                <span className="block font-display text-2xl leading-none tracking-[0.05em] text-cream group-hover:text-amber">
                   {d.label}
                 </span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-cream-faint">{d.note}</span>

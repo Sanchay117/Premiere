@@ -362,13 +362,13 @@ export const Animatic = forwardRef<AnimaticHandle, AnimaticProps>(function Anima
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_45%,#231a10,#08090d_70%)] text-center">
             <span className="font-mono text-[clamp(8px,0.95vw,12px)] uppercase tracking-[0.35em] text-cream-dim">Now showing</span>
             <h3
-              className="mt-[2%] px-[6%] font-serif text-[clamp(30px,6.2vw,88px)] leading-none text-cream"
+              className="mt-[2%] px-[6%] font-display text-[clamp(34px,7vw,96px)] uppercase leading-none tracking-[0.02em] text-cream"
               style={{ letterSpacing: `${0.3 - 0.29 * easeOut(clamp(p / 0.6))}em`, opacity: clamp(p / 0.3) }}
             >
               {plan.appName}
             </h3>
             {plan.tagline && (
-              <p className="sweep mt-[1.5%] px-[8%] font-serif text-[clamp(13px,2vw,28px)] italic" style={{ opacity: clamp((p - 0.25) / 0.3) }}>
+              <p className="mt-[1.5%] px-[8%] text-[clamp(12px,1.8vw,24px)] font-semibold text-amber" style={{ opacity: clamp((p - 0.25) / 0.3) }}>
                 {plan.tagline}
               </p>
             )}

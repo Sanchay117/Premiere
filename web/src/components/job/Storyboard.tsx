@@ -39,7 +39,7 @@ function Rerun({ job }: { job: JobView }) {
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: job.url, planner }),
+        body: JSON.stringify({ url: job.url, planner, ...job.options }),
       });
       const data = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
       if (!response.ok || !data.id) throw new Error(data.error ?? "Could not start the job.");
@@ -53,7 +53,7 @@ function Rerun({ job }: { job: JobView }) {
   return (
     <div className="mt-16 rounded-2xl border border-line bg-ink-2/60 p-6 md:p-8">
       <p className="eyebrow">Second take</p>
-      <h3 className="mt-3 font-serif text-3xl md:text-4xl">Hear another writer on the same app.</h3>
+      <h3 className="mt-3 font-display text-[2.4rem] leading-none tracking-[0.03em]">HEAR ANOTHER WRITER ON THE SAME APP</h3>
       <p className="mt-2 text-sm text-cream-dim">Uses the same capture, so only the script changes. Each plan is cached per model.</p>
       <div className="mt-6 flex flex-wrap gap-3">
         {others.map((p) => (
@@ -101,18 +101,17 @@ export function Storyboard({ job }: { job: JobView }) {
   return (
     <motion.section initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} className="mt-16">
       <p className="eyebrow">{result.trailer ? "How it was planned" : job.status === "running" ? "Storyboard, while the trailer is made" : "Storyboard preview"}</p>
-      <h2 className="mt-3 font-serif text-[clamp(2.2rem,5vw,4rem)] leading-none">
-        {plan.appName}
-        <em className="text-cream-dim">, the storyboard</em>
+      <h2 className="mt-3 font-display text-[clamp(2.6rem,6vw,4.6rem)] uppercase leading-none tracking-[0.02em]">
+        {plan.appName}: <span className="text-cream-dim">the storyboard</span>
       </h2>
-      {plan.tagline && <p className="mt-3 font-serif text-2xl italic text-amber">{plan.tagline}</p>}
+      {plan.tagline && <p className="mt-3 text-xl font-semibold text-amber">{plan.tagline}</p>}
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_330px]">
         <Animatic ref={animatic} jobId={job.id} result={result} onScene={onScene} />
         <aside className="h-fit rounded-2xl border border-line bg-ink-2/70 p-6">
           <p className="eyebrow mb-2">The take</p>
           <Stat label="Script by" value={writer} hint={planner.source === "cache" ? "from cache, $0" : undefined} />
-          <Stat label="Narration" value={`${planner.words} words`} hint="target 95 to 125" />
+          <Stat label="Narration" value={`${planner.words} words`} hint={job.options?.style === "hype" ? "target 75 to 110" : "target 95 to 125"} />
           <Stat label="Runtime" value={`about ${Math.round(runtime)} s`} />
           <Stat label="Shots" value={String(plan.shots.length)} />
           <Stat label="Mood" value={plan.mood} />

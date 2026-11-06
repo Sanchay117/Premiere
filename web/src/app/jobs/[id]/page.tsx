@@ -11,6 +11,7 @@ import { Storyboard } from "@/components/job/Storyboard";
 import { TrailerReady } from "@/components/job/TrailerReady";
 import { useJob } from "@/components/job/useJob";
 import { plannerName } from "@/lib/types";
+import { narratorLabel } from "@/lib/options";
 
 function hostOf(url: string): string {
   try {
@@ -52,7 +53,7 @@ export default function JobPage() {
         </div>
         <div className="mx-auto max-w-7xl px-5 md:px-8">
           <Link href="/" className="eyebrow inline-flex items-center gap-2 transition hover:text-cream">
-            ← Back to the lobby
+            ← Back to the front gate
           </Link>
           <p className="eyebrow mt-10">Screening room</p>
           <motion.h1
@@ -60,7 +61,7 @@ export default function JobPage() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-4 break-words font-serif text-[clamp(2.8rem,8vw,7rem)] leading-[0.92] tracking-[-0.02em]"
+            className="mt-4 break-words font-display text-[clamp(3.2rem,9vw,7.6rem)] uppercase leading-[0.9] tracking-[0.01em]"
           >
             {title}
           </motion.h1>
@@ -69,6 +70,11 @@ export default function JobPage() {
             <div className="mt-6 flex flex-wrap items-center gap-2 text-sm">
               <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim">{host}</span>
               <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim">{plannerName(job.planner)}</span>
+              {job.options && (
+                <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim">
+                  {job.options.style === "hype" ? "Hype cut" : "Walkthrough"} · {job.result?.trailer?.narrator ?? narratorLabel(job.options.voice)} · {job.options.captions} captions
+                </span>
+              )}
               <span
                 className={`flex items-center gap-2 rounded-full px-3 py-1 font-mono text-xs ${
                   job.status === "failed" ? "bg-rec/15 text-rec" : job.status === "done" ? "bg-amber/15 text-amber" : "bg-cream/10 text-cream"

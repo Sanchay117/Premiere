@@ -1,5 +1,5 @@
-// The sky over the drive-in: deep night gradient, twinkling stars, a crescent moon and the odd
-// shooting star. Pure SVG and CSS; the star field is seeded so it renders identically everywhere.
+// The sky over the drive-in: deep night gradient, twinkling stars and a crescent moon. Pure SVG
+// and CSS; the star field is seeded so it renders identically everywhere.
 
 import { seeded } from "./rng";
 
@@ -18,7 +18,7 @@ const STARS = (() => {
   });
 })();
 
-export function NightSky() {
+export function NightSky({ moon = true }: { moon?: boolean }) {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(to_bottom,#04050a_0%,#070915_45%,#11152a_78%,#1a1a2c_100%)]" />
@@ -39,6 +39,7 @@ export function NightSky() {
         ))}
       </svg>
       {/* moon */}
+      {moon && (
       <div className="parallax-mid absolute right-[4%] top-[8.5%] size-[clamp(44px,5vw,78px)]">
         <div className="absolute -inset-[140%] rounded-full bg-[radial-gradient(circle,rgb(255_236_200/0.16),transparent_60%)]" />
         <svg viewBox="0 0 100 100" className="relative h-full w-full">
@@ -51,7 +52,7 @@ export function NightSky() {
           <circle cx="50" cy="50" r="44" fill="#f6e7c8" mask="url(#crescent)" />
         </svg>
       </div>
-      <span className="shooting-star absolute left-[12%] top-[10%] h-px w-28 bg-gradient-to-r from-transparent via-white to-transparent" />
+      )}
     </div>
   );
 }

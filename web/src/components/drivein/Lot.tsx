@@ -16,7 +16,7 @@ function treeLine(width: number, base: number, seed: number, amplitude: number):
 const HILLS = "M0 120 C 180 70, 330 95, 480 80 S 800 40, 1000 75 S 1300 60, 1440 90 L1440 200 L0 200 Z";
 const TREES = treeLine(1440, 150, 7, 46);
 
-/** A 1950s car from behind: cabin dome, tail fins, rear window lit by the screen. */
+/** A 1950s car from behind, as a silhouette against the screen, its roofline rimmed with light. */
 function Car({ x, y, scale, variant, tint }: { x: number; y: number; scale: number; variant: 0 | 1 | 2; tint: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
@@ -33,17 +33,17 @@ function Car({ x, y, scale, variant, tint }: { x: number; y: number; scale: numb
           fill="#05060b"
         />
       )}
-      {/* rear window catching the screen light */}
-      <path
-        d={variant === 2 ? "M74 48 L78 32 L124 32 L130 48 Z" : variant === 0 ? "M58 50 Q72 31 100 30 Q128 31 142 50 Z" : "M56 54 Q72 40 100 39 Q128 40 144 54 Z"}
-        fill="url(#screen-glow)"
-        opacity={0.55 + tint * 0.35}
-      />
-      {/* fins and tail lights */}
+      {/* tail fins */}
       {variant === 0 && <path d="M12 64 L20 44 L28 58 Z M188 64 L180 44 L172 58 Z" fill="#05060b" />}
-      <rect x="16" y="64" width="12" height="5" rx="2" fill="#5a1a1a" />
-      <rect x="172" y="64" width="12" height="5" rx="2" fill="#5a1a1a" />
-      <rect x="6" y="85" width="188" height="4" rx="2" fill="#0b0d16" />
+      {/* the screen's light catching the roofline */}
+      <path
+        d={variant === 2 ? "M66 30 Q70 26 80 26 L122 26 Q132 26 136 32" : variant === 0 ? "M44 51 Q60 24 100 23 Q140 24 156 51" : "M38 55 Q56 34 100 33 Q144 34 162 55"}
+        fill="none"
+        stroke="#ffe2b0"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        opacity={0.16 + tint * 0.16}
+      />
     </g>
   );
 }
@@ -53,7 +53,6 @@ function Speaker({ x, y, scale }: { x: number; y: number; scale: number }) {
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
       <rect x="-1.5" y="0" width="3" height="60" fill="#05060b" />
       <rect x="-9" y="-6" width="18" height="12" rx="2" fill="#05060b" />
-      <circle cx="0" cy="0" r="2" fill="#ffb547" opacity="0.35" />
     </g>
   );
 }

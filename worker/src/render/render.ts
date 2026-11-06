@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
-import { openBrowser, renderMedia, renderStill, selectComposition } from "@remotion/renderer";
+import { openBrowser, renderMedia, renderStill, selectComposition, type HeadlessBrowser } from "@remotion/renderer";
 import type { ThumbnailProps, TrailerProps } from "./remotion/types";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -101,35 +101,53 @@ export interface RenderOutputs {
   thumbnails: string[];
 }
 
-export async function renderTrailer(
+interface Renderer {
+  /** Base URL the job's files are served from. */
+  base: string;
+  shared: { serveUrl: string; browserExecutable: string | null; puppeteerInstance: HeadlessBrowser };
+}
+
+/** Serves the job's files and opens one browser for everything rendered from them. */
+async function withRenderer<T>(jobDir: string, work: (renderer: Renderer) => Promise<T>): Promise<T> {
+  const server = await serveDirectory(jobDir);
+  const browserExecutable = headlessShell() ?? null;
+  const browser = await openBrowser("chrome", { browserExecutable });
+  try {
+    const serveUrl = await getBundle();
+    return await work({ base: server.url, shared: { serveUrl, browserExecutable, puppeteerInstance: browser } });
+  } finally {
+    await browser.close({ silent: true }).catch(() => {});
+    await server.close();
+  }
+}
+
+/** Both thumbnails, 1920 and 1280 wide, from one composition. */
+async function renderStills(jobDir: string, { base, shared }: Renderer, thumbnail: Omit<ThumbnailProps, "base">): Promise<string[]> {
+  const inputProps: ThumbnailProps = { ...thumbnail, base };
+  const composition = await selectComposition({ ...shared, id: "Thumbnail", inputProps });
+  const big = path.join(jobDir, "thumbnail-1920.png");
+  const small = path.join(jobDir, "thumbnail-1280.png");
+  await Promise.all([
+    renderStill({ ...shared, composition, output: big, inputProps, imageFormat: "png" }),
+    renderStill({ ...shared, composition, output: small, inputProps, imageFormat: "png", scale: 2 / 3 }),
+  ]);
+  return [big, small];
+}
+
+export function renderTrailer(
   jobDir: string,
   trailer: Omit<TrailerProps, "base">,
   thumbnail: Omit<ThumbnailProps, "base">,
   onProgress?: (fraction: number) => void,
 ): Promise<RenderOutputs> {
-  const server = await serveDirectory(jobDir);
-  const browserExecutable = headlessShell() ?? null;
-  // One browser for everything: the video and both thumbnails render in tabs of it.
-  const browser = await openBrowser("chrome", { browserExecutable });
-  try {
-    const serveUrl = await getBundle();
-    const trailerProps: TrailerProps = { ...trailer, base: server.url };
-    const thumbProps: ThumbnailProps = { ...thumbnail, base: server.url };
-    const shared = { serveUrl, browserExecutable, puppeteerInstance: browser };
-    const [composition, still] = await Promise.all([
-      selectComposition({ ...shared, id: "Trailer", inputProps: trailerProps }),
-      selectComposition({ ...shared, id: "Thumbnail", inputProps: thumbProps }),
-    ]);
-    const video = path.join(jobDir, "trailer.mp4");
-    const big = path.join(jobDir, "thumbnail-1920.png");
-    const small = path.join(jobDir, "thumbnail-1280.png");
-
-    // The thumbnails render alongside the video instead of after it.
-    const stills = Promise.all([
-      renderStill({ ...shared, composition: still, output: big, inputProps: thumbProps, imageFormat: "png" }),
-      renderStill({ ...shared, composition: still, output: small, inputProps: thumbProps, imageFormat: "png", scale: 2 / 3 }),
-    ]);
+  return withRenderer(jobDir, async (renderer) => {
+    const { shared } = renderer;
+    // The thumbnails render alongside the video, in tabs of the same browser, instead of after it.
+    const stills = renderStills(jobDir, renderer, thumbnail);
     stills.catch(() => {}); // awaited below; keeps a failure from going unhandled meanwhile
+    const inputProps: TrailerProps = { ...trailer, base: renderer.base };
+    const composition = await selectComposition({ ...shared, id: "Trailer", inputProps });
+    const video = path.join(jobDir, "trailer.mp4");
     await renderMedia({
       ...shared,
       composition,
@@ -142,14 +160,15 @@ export async function renderTrailer(
       audioCodec: "aac",
       audioBitrate: "192k",
       outputLocation: video,
-      inputProps: trailerProps,
+      inputProps,
       timeoutInMilliseconds: 60_000,
       onProgress: ({ progress }) => onProgress?.(progress),
     });
-    await stills;
-    return { video, thumbnails: [big, small] };
-  } finally {
-    await browser.close({ silent: true }).catch(() => {});
-    await server.close();
-  }
+    return { video, thumbnails: await stills };
+  });
+}
+
+/** Only the thumbnails, for restyling them without rendering the video again. */
+export function renderThumbnails(jobDir: string, thumbnail: Omit<ThumbnailProps, "base">): Promise<string[]> {
+  return withRenderer(jobDir, (renderer) => renderStills(jobDir, renderer, thumbnail));
 }

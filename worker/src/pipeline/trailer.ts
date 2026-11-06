@@ -12,7 +12,8 @@ import { hostLabel } from "../lib/url";
 import { NARRATORS, narratorFor, type CaptionStyle, type TrailerOptions } from "../options";
 import type { Plan } from "../planner/schema";
 import { closeStage, openStage, recordPlan } from "../record/recorder";
-import { renderTrailer, type RenderOutputs } from "../render/render";
+import { renderThumbnails, renderTrailer, type RenderOutputs } from "../render/render";
+import { chooseThumbnail } from "../render/thumbnail";
 import { buildTimeline, FPS, shotHolds, toSrt, type Timeline } from "../render/timeline";
 import type { ThumbnailProps, TrailerProps, TrailerSegment } from "../render/remotion/types";
 import { voicePlan, type VoiceLine } from "../voice/deepgram";
@@ -31,6 +32,19 @@ interface EditFile {
   thumbnail: Omit<ThumbnailProps, "base">;
 }
 
+async function readEdit(jobDir: string): Promise<EditFile> {
+  const edit = JSON.parse(await readFile(path.join(jobDir, "edit.json"), "utf8")) as Partial<EditFile>;
+  if (edit.version !== EDIT_VERSION || !edit.trailer || !edit.thumbnail) {
+    throw new Error(`${jobDir} has no edit.json this version can re-render. Make the trailer again instead.`);
+  }
+  return edit as EditFile;
+}
+
+/** The thumbnail as the current code would choose it, so re-rendered jobs pick up new looks. */
+async function currentThumbnail(jobDir: string, edit: EditFile): Promise<EditFile["thumbnail"]> {
+  return { app: edit.thumbnail.app, style: edit.thumbnail.style ?? edit.trailer.style, ...(await chooseThumbnail(jobDir, edit.trailer)) };
+}
+
 /** Renders a finished job again from its saved edit and footage. For iterating on the look; the
  *  caption look can be swapped without new voice or filming. */
 export async function rerenderTrailer(
@@ -38,13 +52,15 @@ export async function rerenderTrailer(
   onProgress?: (fraction: number) => void,
   overrides: { captions?: CaptionStyle } = {},
 ): Promise<RenderOutputs> {
-  const edit = JSON.parse(await readFile(path.join(jobDir, "edit.json"), "utf8")) as Partial<EditFile>;
-  if (edit.version !== EDIT_VERSION || !edit.trailer || !edit.thumbnail) {
-    throw new Error(`${jobDir} has no edit.json this version can re-render. Make the trailer again instead.`);
-  }
+  const edit = await readEdit(jobDir);
   const trailer = overrides.captions ? { ...edit.trailer, captions: overrides.captions } : edit.trailer;
-  const thumbnail = { ...edit.thumbnail, style: edit.thumbnail.style ?? edit.trailer.style };
-  return renderTrailer(jobDir, trailer, thumbnail, onProgress);
+  return renderTrailer(jobDir, trailer, await currentThumbnail(jobDir, edit), onProgress);
+}
+
+/** Renders only a finished job's two thumbnails again, in a few seconds. */
+export async function rerenderThumbnails(jobDir: string): Promise<string[]> {
+  const edit = await readEdit(jobDir);
+  return renderThumbnails(jobDir, await currentThumbnail(jobDir, edit));
 }
 
 export interface TrailerHooks {
@@ -155,10 +171,16 @@ export async function makeTrailer(
   const app = { name: plan.appName, tagline: plan.tagline, cta: plan.cta, host: hostLabel(capture.finalUrl) };
   const segments = trailerSegments(timeline);
   const durationInFrames = segments.reduce((a, s) => a + s.frames, 0);
-  // Thumbnail backdrop: the frame where the first filmed shot's action has landed.
-  const firstShot = timeline.segments.find((s) => s.kind === "shot")?.shot;
-  const backdropTime = firstShot ? firstShot.footageStart + firstShot.actionAt + 0.8 : 0;
-  const backdrop = recording.frames.filter((f) => f.t <= backdropTime).at(-1) ?? recording.frames[0];
+  const trailer: EditFile["trailer"] = {
+    fps: FPS,
+    durationInFrames,
+    app,
+    segments,
+    frames: recording.frames,
+    soundtrack: "soundtrack.wav",
+    style: options.style,
+    captions: options.captions,
+  };
 
   // The edit is saved before rendering, so a failed or restyled render can be redone from it.
   const edit: EditFile = {
@@ -166,17 +188,8 @@ export async function makeTrailer(
     url: capture.finalUrl,
     duration: timeline.duration,
     skipped: timeline.skipped,
-    trailer: {
-      fps: FPS,
-      durationInFrames,
-      app,
-      segments,
-      frames: recording.frames,
-      soundtrack: "soundtrack.wav",
-      style: options.style,
-      captions: options.captions,
-    },
-    thumbnail: { app, frame: backdrop?.file ?? "", style: options.style },
+    trailer,
+    thumbnail: { app, style: options.style, ...(await chooseThumbnail(jobDir, trailer)) },
   };
   await writeFile(path.join(jobDir, "edit.json"), JSON.stringify(edit, null, 2));
   const captions = path.join(jobDir, "captions.srt");

@@ -389,9 +389,10 @@ function PunchCard({ text, seconds }: { text: string; seconds: number }) {
   );
 }
 
-const BAR = 54;
+export const BAR = 54;
 
-function WindowBar({ host }: { host: string }) {
+/** The hype cut's browser chrome; the hype thumbnail uses it too. */
+export function WindowBar({ host }: { host: string }) {
   return (
     <div style={{ height: BAR, display: "flex", alignItems: "center", gap: 12, padding: "0 22px", background: "#14161d", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
       {["#ff6159", "#ffbd2e", "#28c941"].map((c) => (

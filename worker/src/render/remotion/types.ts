@@ -46,4 +46,6 @@ export type ThumbnailProps = {
   frame: string;
   /** Missing in edits saved before styles existed. */
   style?: TrailerStyle;
+  /** The app's own color for the title rule, tagline and glow (render/thumbnail.ts). Amber when missing. */
+  accent?: string;
 };

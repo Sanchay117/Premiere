@@ -44,4 +44,6 @@ export type ThumbnailProps = {
   app: AppInfo;
   /** Frame file to use as the backdrop. */
   frame: string;
+  /** Missing in edits saved before styles existed. */
+  style?: TrailerStyle;
 };

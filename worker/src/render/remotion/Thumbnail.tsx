@@ -1,12 +1,16 @@
-// Thumbnail still: a frame of the footage behind the title, in the site's style.
+// Thumbnail still: a frame of the footage behind the title, matching the cut: the serif title of
+// a walkthrough, or the poster gothic of a hype trailer.
 
 import type React from "react";
 import { AbsoluteFill, Img } from "remotion";
-import { COLORS, mono, serif } from "./fonts";
+import { COLORS, gothic, mono, sans, serif } from "./fonts";
 import type { ThumbnailProps } from "./types";
 
-export const Thumbnail: React.FC<ThumbnailProps> = ({ base, app, frame }) => {
-  const nameSize = Math.round(Math.max(110, Math.min(210, 1150 / Math.max(1, app.name.length * 0.46))));
+export const Thumbnail: React.FC<ThumbnailProps> = ({ base, app, frame, style = "walkthrough" }) => {
+  const hype = style === "hype";
+  const name = hype ? app.name.toUpperCase() : app.name;
+  const perChar = hype ? 0.36 : 0.46;
+  const nameSize = Math.round(Math.max(110, Math.min(hype ? 260 : 210, 1150 / Math.max(1, name.length * perChar))));
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.ink }}>
       {frame && <Img src={`${base}/frames/${frame}`} style={{ width: 1920, height: 1080, objectFit: "cover" }} />}
@@ -18,12 +22,19 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ base, app, frame }) => {
       />
       <AbsoluteFill style={{ padding: "0 130px", justifyContent: "center" }}>
         <div style={{ fontFamily: mono, fontSize: 28, letterSpacing: "0.38em", color: COLORS.amber }}>NOW SHOWING</div>
-        <div style={{ fontFamily: serif, fontSize: nameSize, lineHeight: 0.95, color: COLORS.cream, marginTop: 24, maxWidth: 1150 }}>{app.name}</div>
-        {app.tagline && (
-          <div style={{ fontFamily: serif, fontStyle: "italic", fontSize: 64, lineHeight: 1.1, color: COLORS.amber, marginTop: 26, maxWidth: 1050 }}>
-            {app.tagline}
-          </div>
-        )}
+        <div style={{ fontFamily: hype ? gothic : serif, fontSize: nameSize, lineHeight: hype ? 0.9 : 0.95, color: COLORS.cream, marginTop: 24, maxWidth: 1150 }}>
+          {name}
+        </div>
+        {app.tagline &&
+          (hype ? (
+            <div style={{ fontFamily: sans, fontWeight: 700, fontSize: 58, lineHeight: 1.15, color: COLORS.amber, marginTop: 28, maxWidth: 1050 }}>
+              {app.tagline}
+            </div>
+          ) : (
+            <div style={{ fontFamily: serif, fontStyle: "italic", fontSize: 64, lineHeight: 1.1, color: COLORS.amber, marginTop: 26, maxWidth: 1050 }}>
+              {app.tagline}
+            </div>
+          ))}
         <div style={{ display: "flex", alignItems: "center", gap: 28, marginTop: 64 }}>
           <div
             style={{

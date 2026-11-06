@@ -43,7 +43,8 @@ export async function rerenderTrailer(
     throw new Error(`${jobDir} has no edit.json this version can re-render. Make the trailer again instead.`);
   }
   const trailer = overrides.captions ? { ...edit.trailer, captions: overrides.captions } : edit.trailer;
-  return renderTrailer(jobDir, trailer, edit.thumbnail, onProgress);
+  const thumbnail = { ...edit.thumbnail, style: edit.thumbnail.style ?? edit.trailer.style };
+  return renderTrailer(jobDir, trailer, thumbnail, onProgress);
 }
 
 export interface TrailerHooks {
@@ -165,7 +166,7 @@ export async function makeTrailer(
       style: options.style,
       captions: options.captions,
     },
-    thumbnail: { app, frame: backdrop?.file ?? "" },
+    thumbnail: { app, frame: backdrop?.file ?? "", style: options.style },
   };
   await writeFile(path.join(jobDir, "edit.json"), JSON.stringify(edit, null, 2));
   const captions = path.join(jobDir, "captions.srt");

@@ -49,7 +49,7 @@ function Clock({ seconds }: { seconds: ReturnType<typeof useSpring> }) {
   const minuteAngle = useTransform(seconds, (s) => s * 0.1);
   const hourAngle = useTransform(seconds, (s) => 60 + s / 120);
   return (
-    <div className="relative size-44 rounded-full border-2 border-cream/30 bg-[radial-gradient(circle,#15120d,#0b0a08)] md:size-52">
+    <div className="relative size-36 shrink-0 rounded-full border-2 border-cream/30 bg-[radial-gradient(circle,#15120d,#0b0a08)] sm:size-44 md:size-52">
       {Array.from({ length: 12 }, (_, i) => (
         // Each tick hangs from the top edge with its pivot at the clock's center.
         <span
@@ -96,7 +96,7 @@ export function Program() {
           </Reveal>
           <div className="mt-9 flex items-center gap-6">
             <Clock seconds={seconds} />
-            <motion.p className="font-mono text-2xl font-bold tabular-nums text-cream">{clockLabel}</motion.p>
+            <motion.p className="font-mono text-xl font-bold tabular-nums text-cream sm:text-2xl">{clockLabel}</motion.p>
           </div>
         </div>
 

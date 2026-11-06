@@ -41,7 +41,8 @@ export function Hero() {
             <UrlForm url={url} onUrlChange={setUrl} />
           </div>
 
-          <div className="rise lg:sticky lg:top-24 lg:pt-4" style={{ ["--delay" as string]: "0.3s" }}>
+          {/* On a phone the screen comes first, so the output is in view before the order form. */}
+          <div className="rise order-first lg:sticky lg:top-24 lg:order-none lg:pt-4" style={{ ["--delay" as string]: "0.3s" }}>
             <BigScreen />
           </div>
         </div>

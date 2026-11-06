@@ -13,7 +13,9 @@ export function LobbyCard({ entry, i }: { entry: GalleryEntry; i: number }) {
   return (
     <Link
       href={`/jobs/${entry.id}`}
-      className="paper group block p-2.5 pb-3 shadow-[0_24px_50px_-24px_rgb(0_0_0/0.95)] transition duration-300 hover:-translate-y-1"
+      // min-w-0: as a grid item the card would otherwise grow to fit its untruncated caption and
+      // push a phone screen sideways.
+      className="paper group block min-w-0 p-2.5 pb-3 shadow-[0_24px_50px_-24px_rgb(0_0_0/0.95)] transition duration-300 hover:-translate-y-1"
       style={{ rotate: `${(i % 3) - 1}deg` }}
     >
       <div className="relative aspect-video overflow-hidden bg-ink">

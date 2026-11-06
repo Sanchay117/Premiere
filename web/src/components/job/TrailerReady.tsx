@@ -13,7 +13,7 @@ function TicketText({ label, note }: { label: string; note: string }) {
   return (
     <span>
       <span className="block font-display text-2xl leading-none tracking-[0.05em] text-cream group-hover:text-amber">{label}</span>
-      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-cream-faint">{note}</span>
+      <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-cream-faint sm:inline">{note}</span>
     </span>
   );
 }
@@ -72,7 +72,7 @@ function ShareTickets({ appName }: { appName: string }) {
   const note = phone ? "Messages, Discord, anywhere" : state === "failed" ? "Copy it from the address bar" : "For Discord, Slack, anywhere";
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-3">
+    <div className="mt-3 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center">
       <a href={intent} target="_blank" rel="noopener noreferrer" className={TICKET}>
         <svg viewBox="0 0 24 24" className="size-4 text-amber" fill="currentColor" aria-hidden>
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -131,7 +131,7 @@ export function TrailerReady({ job }: { job: JobView }) {
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center">
         {DOWNLOADS.map((d) => {
           const name = names[d.key];
           if (!name) return null;

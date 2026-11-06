@@ -92,7 +92,8 @@ export function BigScreen() {
   return (
     <div className="relative">
       {/* Projector beam, from the booth in the lot up to the screen. */}
-      <div aria-hidden className="pointer-events-none absolute -bottom-[clamp(160px,26vw,340px)] -left-[6%] -right-[6%] top-[8%] -z-10">
+      {/* Only on wide screens, where the lot of cars sits under the screen to aim it from. */}
+      <div aria-hidden className="pointer-events-none absolute -bottom-[clamp(160px,26vw,340px)] -left-[6%] -right-[6%] top-[8%] -z-10 hidden lg:block">
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="flicker absolute inset-0 h-full w-full blur-[10px]">
           <defs>
             <linearGradient id="beam" x1="0" y1="1" x2="0" y2="0">
@@ -110,7 +111,7 @@ export function BigScreen() {
       <div className="relative bg-[#0f0f12] p-[0.9%] ring-1 ring-white/5 shadow-[0_0_90px_rgb(220_230_255/0.12)]">
         <SampleTrailer />
       </div>
-      <p className="mt-2 text-right font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-faint">
+      <p className="mt-2 text-balance font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-faint lg:text-right">
         On screen: a real trailer Premiere made of fundable.vibestarter.xyz from its link alone
       </p>
       {/* Support posts */}

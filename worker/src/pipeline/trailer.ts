@@ -13,7 +13,7 @@ import { NARRATORS, narratorFor, type CaptionStyle, type TrailerOptions } from "
 import { fallbackPlan } from "../planner/fallback";
 import type { Plan } from "../planner/schema";
 import { validatePlan } from "../planner/validate";
-import { openStage, recordPlan } from "../record/recorder";
+import { inFilmingSlot, openStage, recordPlan } from "../record/recorder";
 import { renderThumbnails, renderTrailer, type RenderOutputs } from "../render/render";
 import { chooseThumbnail } from "../render/thumbnail";
 import { buildTimeline, FPS, shotHolds, toSrt, type Timeline } from "../render/timeline";
@@ -137,12 +137,11 @@ export async function makeTrailer(
   // Shoot
   hooks.onStepStart?.("record", "Opening the app for the shoot");
   const onRecordProgress = (d: string) => hooks.onStepProgress?.("record", d);
-  let recording = await recordPlan(capture, shotPlan, {
-    holds: shotHolds(voiced.lines, shotPlan, options.style),
-    outDir: jobDir,
-    onProgress: onRecordProgress,
-    stage,
-  });
+  const waitForTurn = () => onRecordProgress("Waiting for another shoot to finish");
+  let recording = await inFilmingSlot(
+    () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style), outDir: jobDir, onProgress: onRecordProgress, stage }),
+    waitForTurn,
+  );
   let timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style);
   let filmed = timeline.segments.filter((s) => s.kind === "shot").length;
   if (filmed === 0) {
@@ -153,7 +152,10 @@ export async function makeTrailer(
     onRecordProgress("None of the planned shots worked; filming a simpler tour of the page");
     shotPlan = { ...plan, shots: validatePlan(fallbackPlan(capture), capture, options.style).plan.shots };
     voiced = voiced.narrated ? await voiceOrCaptions(shotPlan, options, onRecordProgress) : { lines: silentLines(shotPlan), narrated: false };
-    recording = await recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style), outDir: jobDir, onProgress: onRecordProgress });
+    recording = await inFilmingSlot(
+      () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style), outDir: jobDir, onProgress: onRecordProgress }),
+      waitForTurn,
+    );
     timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style);
     filmed = timeline.segments.filter((s) => s.kind === "shot").length;
     notes.push("None of the planned shots could be filmed, so this is a simpler tour of the page.");

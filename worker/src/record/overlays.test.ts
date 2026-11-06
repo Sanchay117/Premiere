@@ -26,3 +26,22 @@ test("a dialog left open by the last click is closed before the next shot, and n
     await browser.close();
   }
 });
+
+test("shoots take turns: a second shoot starts only when the first has finished", async () => {
+  const { inFilmingSlot } = await import("./recorder");
+  const events: string[] = [];
+  let waited = false;
+  const shoot = (name: string, ms: number) => async () => {
+    events.push(`${name} start`);
+    await new Promise((r) => setTimeout(r, ms));
+    events.push(`${name} end`);
+    return name;
+  };
+  const results = await Promise.all([inFilmingSlot(shoot("a", 60)), inFilmingSlot(shoot("b", 10), () => (waited = true))]);
+  assert.deepEqual(results, ["a", "b"]);
+  assert.deepEqual(events, ["a start", "a end", "b start", "b end"]);
+  assert.equal(waited, true);
+  // A failed shoot still frees the slot.
+  await assert.rejects(inFilmingSlot(async () => Promise.reject(new Error("boom"))));
+  assert.equal(await inFilmingSlot(async () => "after"), "after");
+});

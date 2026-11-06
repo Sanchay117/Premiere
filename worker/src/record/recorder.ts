@@ -50,6 +50,27 @@ export interface Recording {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
+let shootQueue: Promise<void> = Promise.resolve();
+let shooting = 0;
+
+/** Runs a shoot once no other shoot is running. Filming is the one step that happens in real
+ *  time: two shoots at once on the dev laptop captured 18 to 30% fewer frames, so with
+ *  JOB_CONCURRENCY above one, jobs still overlap their voice and render but take turns filming. */
+export async function inFilmingSlot<T>(shoot: () => Promise<T>, onWait?: () => void): Promise<T> {
+  if (shooting > 0) onWait?.();
+  shooting++;
+  const previous = shootQueue;
+  let release!: () => void;
+  shootQueue = new Promise<void>((resolve) => (release = resolve));
+  try {
+    await previous;
+    return await shoot();
+  } finally {
+    shooting--;
+    release();
+  }
+}
+
 /** Whether a dialog, menu or list a click opened is still showing. */
 function overlayOpen(page: Page): Promise<boolean> {
   return page

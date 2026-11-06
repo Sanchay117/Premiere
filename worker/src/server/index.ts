@@ -13,6 +13,7 @@ import http from "node:http";
 import path from "node:path";
 import { config } from "../config";
 import { assertPublicUrl, UnsafeUrlError } from "../safety/url-guard";
+import { accessRequired, admit } from "./access";
 import { createJob, getJob, jobFile, toView } from "./jobs";
 import type { PlannerChoice } from "./types";
 
@@ -58,7 +59,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const { pathname } = new URL(req.url ?? "/", "http://worker");
 
   if (req.method === "GET" && pathname === "/health") {
-    return send(res, 200, { ok: true, claude: Boolean(config.apiKey), voice: Boolean(config.deepgramKey), model: config.model });
+    return send(res, 200, { ok: true, claude: Boolean(config.apiKey), voice: Boolean(config.deepgramKey), model: config.model, accessRequired });
   }
 
   if (req.method === "POST" && pathname === "/jobs") {
@@ -78,7 +79,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       const message = err instanceof UnsafeUrlError || err instanceof Error ? err.message : "That link does not work.";
       return send(res, 400, { error: message });
     }
+    // The web app forwards a hashed visitor id; direct callers fall back to their socket address.
+    const visitor = String(req.headers["x-visitor"] ?? req.socket.remoteAddress ?? "unknown").slice(0, 128);
+    const decision = await admit(typeof body.code === "string" ? body.code.slice(0, 64) : undefined, visitor);
+    if (!decision.ok) return send(res, 403, { error: decision.reason });
     const job = createJob(url.href, planner, body.fresh === true);
+    console.log(`job ${job.id.slice(0, 8)} admitted${decision.code ? ` with code ${decision.code}` : ""}`);
     return send(res, 202, { id: job.id });
   }
 

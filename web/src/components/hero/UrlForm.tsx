@@ -9,6 +9,7 @@ import { ModelPicker } from "./ModelPicker";
 export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrlChange: (url: string) => void }) {
   const router = useRouter();
   const [planner, setPlanner] = useState<PlannerChoice>("sonnet");
+  const [code, setCode] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "closing">("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +27,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url, planner }),
+        body: JSON.stringify({ url, planner, code: code.trim() || undefined }),
       });
       data = await response.json().catch(() => ({}));
       ok = response.ok && Boolean(data.id);
@@ -82,6 +83,21 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
             {error}
           </p>
         )}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label htmlFor="code" className="font-mono text-[11px] uppercase tracking-[0.2em] text-cream-faint">
+            Entrant code
+          </label>
+          <input
+            id="code"
+            name="code"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="Vibeathon 02 entrants ride free"
+            autoComplete="off"
+            spellCheck={false}
+            className="min-w-0 flex-1 rounded-lg border border-line bg-ink-2/70 px-3 py-2 font-mono text-sm tracking-[0.12em] text-cream outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-cream-faint focus:border-amber/60"
+          />
+        </div>
       </div>
       <ModelPicker value={planner} onChange={setPlanner} />
       <LetterboxClose active={state === "closing"} />

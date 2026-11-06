@@ -18,22 +18,41 @@ export async function readCapture(dir: string): Promise<Capture | null> {
   }
 }
 
+type Loaded = StoredCapture & { cached: boolean };
+
+/** Captures in progress, by folder: two jobs for the same page share one capture instead of both
+ *  writing into the same folder at once. */
+const inflight = new Map<string, Promise<Loaded>>();
+
 /** Reuses the saved capture for this URL unless `fresh` is set. */
-export async function loadOrCapture(
+export function loadOrCapture(
   rawUrl: string,
   { fresh = false, onProgress }: { fresh?: boolean; onProgress?: (detail: string) => void } = {},
-): Promise<StoredCapture & { cached: boolean }> {
+): Promise<Loaded> {
   const url = normalizeUrl(rawUrl);
   const dir = captureDir(url);
-  if (!fresh) {
-    const saved = await readCapture(dir);
-    if (saved) {
-      onProgress?.("Using a saved capture of this page");
-      return { capture: saved, dir, cached: true };
-    }
+  const running = inflight.get(dir);
+  if (running) {
+    onProgress?.("Another order is opening this page; sharing its capture");
+    return running.then((loaded) => ({ ...loaded, cached: true }));
   }
-  await rm(dir, { recursive: true, force: true });
-  await mkdir(dir, { recursive: true });
-  const capture = await capturePage(url.href, { outDir: dir, onProgress });
-  return { capture, dir, cached: false };
+  const task = (async (): Promise<Loaded> => {
+    if (!fresh) {
+      const saved = await readCapture(dir);
+      if (saved) {
+        onProgress?.("Using a saved capture of this page");
+        return { capture: saved, dir, cached: true };
+      }
+    }
+    await rm(dir, { recursive: true, force: true });
+    await mkdir(dir, { recursive: true });
+    const capture = await capturePage(url.href, { outDir: dir, onProgress });
+    return { capture, dir, cached: false };
+  })();
+  inflight.set(dir, task);
+  task.then(
+    () => inflight.delete(dir),
+    () => inflight.delete(dir),
+  );
+  return task;
 }

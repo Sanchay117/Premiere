@@ -94,6 +94,8 @@ export interface JobView {
   planner: PlannerChoice;
   status: "queued" | "running" | "done" | "failed";
   queuePosition: number | null;
+  /** Roughly how long until a queued job starts, from how long recent jobs took. */
+  waitSeconds?: number | null;
   createdAt: string;
   updatedAt: string;
   steps: JobStepView[];

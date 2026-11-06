@@ -29,7 +29,9 @@ export default function JobPage() {
   const statusText = !job
     ? ""
     : job.status === "queued"
-      ? `In the queue${job.queuePosition ? `, number ${job.queuePosition}` : ""}`
+      ? `In the queue${job.queuePosition ? `, number ${job.queuePosition}` : ""}${
+          job.waitSeconds ? `, starts in about ${Math.max(1, Math.round(job.waitSeconds / 60))} min` : ""
+        }`
       : job.status === "running"
         ? "Rolling"
         : job.status === "done"

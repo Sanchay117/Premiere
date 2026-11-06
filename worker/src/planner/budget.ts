@@ -29,8 +29,13 @@ export class SpendLedger {
     readonly limitUsd: number,
   ) {}
 
+  private static shared: SpendLedger | null = null;
+
+  /** The process's one ledger. Writes are serialized per instance, so jobs planning at the same
+   *  time must share it or one could overwrite another's cost. */
   static default(): SpendLedger {
-    return new SpendLedger(path.join(config.dataDir, "spend.json"), config.monthlyBudgetUsd);
+    SpendLedger.shared ??= new SpendLedger(path.join(config.dataDir, "spend.json"), config.monthlyBudgetUsd);
+    return SpendLedger.shared;
   }
 
   private async read(): Promise<LedgerFile> {

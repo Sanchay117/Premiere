@@ -33,10 +33,16 @@ const JOB_FILE = "job.json";
 const OUTPUT_FILES = new Set(["trailer.mp4", "thumbnail-1920.png", "thumbnail-1280.png", "captions.srt"]);
 
 const MAX_JOBS = 200;
-const CONCURRENCY = 1;
+/** Jobs that run at once. One on a laptop; two suit a machine with 8 or more cores, where one job
+ *  can film while another renders. Each running job drives its own browser. */
+const CONCURRENCY = Math.min(4, Math.max(1, Math.floor(Number(process.env.JOB_CONCURRENCY) || 1)));
 const jobs = new Map<string, Job>();
 const queue: string[] = [];
 let running = 0;
+
+/** How long the last few finished jobs took, for the wait shown to people in the queue. */
+const recentSeconds: number[] = [];
+const typicalSeconds = () => (recentSeconds.length ? recentSeconds.reduce((a, b) => a + b, 0) / recentSeconds.length : 150);
 
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "capture", label: "Opening the app" },
@@ -137,7 +143,10 @@ export async function findJob(id: string): Promise<Job | undefined> {
 export function toView(job: Job): JobView {
   const { fresh: _fresh, dir: _dir, outDir: _outDir, ...view } = job;
   const position = queue.indexOf(job.id);
-  return { ...view, queuePosition: position >= 0 ? position + 1 : null };
+  // Every slot is busy while anyone waits, so this job starts after `position` more jobs finish,
+  // spread over the slots.
+  const waitSeconds = position >= 0 ? Math.round(Math.ceil((position + 1) / CONCURRENCY) * typicalSeconds()) : null;
+  return { ...view, queuePosition: position >= 0 ? position + 1 : null, waitSeconds };
 }
 
 /** Files a job may serve: its own screenshots and, once rendered, its outputs. */
@@ -158,11 +167,16 @@ function pump(): void {
     const job = jobs.get(id);
     if (!job) continue;
     running++;
+    const started = Date.now();
     run(job)
       .catch((err) => console.error(`job ${id} crashed:`, err))
       .finally(() => {
         running--;
         finishedAt = Date.now();
+        if (job.status === "done") {
+          recentSeconds.push((finishedAt - started) / 1000);
+          if (recentSeconds.length > 5) recentSeconds.shift();
+        }
         saveJob(job).catch((err) => console.error(`job ${id} could not be saved:`, err));
         pump();
       });

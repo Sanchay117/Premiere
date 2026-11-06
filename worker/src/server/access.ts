@@ -35,7 +35,8 @@ function parseCodes(raw: string | undefined): Map<string, number> {
 }
 
 const CODES = parseCodes(process.env.ACCESS_CODES);
-const PER_VISITOR = Number(process.env.ACCESS_PER_VISITOR_DAILY) || 3;
+// Five, so a judge or a curious founder can try several apps in one sitting.
+const PER_VISITOR = Number(process.env.ACCESS_PER_VISITOR_DAILY) || 5;
 const DAILY_CAP = Number(process.env.ACCESS_DAILY_CAP) || (CODES.size ? 80 : 200);
 const FILE = path.join(config.dataDir, "access.json");
 const SECRET_FILE = path.join(config.dataDir, "access-secret");

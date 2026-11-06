@@ -3,18 +3,25 @@
 // without changing the HTTP API.
 
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { CaptureError } from "../capture/capture";
 import { loadOrCapture } from "../capture/store";
-import { MODELS } from "../config";
+import { config, MODELS } from "../config";
+import { makeTrailer } from "../pipeline/trailer";
 import { planTrailer } from "../planner/index";
 import { UnsafeUrlError } from "../safety/url-guard";
+import { VoiceError } from "../voice/deepgram";
 import type { JobStepView, JobView, PlannerChoice, StepKey } from "./types";
 
 interface Job extends JobView {
   fresh: boolean;
   /** Capture directory, for serving screenshots. */
   dir: string | null;
+  /** Job output directory: frames, soundtrack, trailer, thumbnails, captions. */
+  outDir: string;
 }
+
+const OUTPUT_FILES = new Set(["trailer.mp4", "thumbnail-1920.png", "thumbnail-1280.png", "captions.srt"]);
 
 const MAX_JOBS = 200;
 const CONCURRENCY = 1;
@@ -25,9 +32,9 @@ let running = 0;
 const STEPS: { key: StepKey; label: string; built: boolean }[] = [
   { key: "capture", label: "Opening the app", built: true },
   { key: "plan", label: "Writing the script", built: true },
-  { key: "record", label: "Recording footage", built: false },
-  { key: "voice", label: "Recording the voiceover", built: false },
-  { key: "render", label: "Final cut", built: false },
+  { key: "voice", label: "Recording the voiceover", built: true },
+  { key: "record", label: "Filming the app", built: true },
+  { key: "render", label: "Final cut", built: true },
 ];
 
 const PLANNER_NAMES: Record<PlannerChoice, string> = {
@@ -60,8 +67,10 @@ function finishStep(job: Job, key: StepKey, status: "done" | "failed", detail: s
 }
 
 export function createJob(url: string, planner: PlannerChoice, fresh: boolean): Job {
+  const id = randomUUID();
   const job: Job = {
-    id: randomUUID(),
+    id,
+    outDir: path.join(config.dataDir, "jobs", id),
     url,
     planner,
     status: "queued",
@@ -97,16 +106,17 @@ export function getJob(id: string): Job | undefined {
 }
 
 export function toView(job: Job): JobView {
-  const { fresh: _fresh, dir: _dir, ...view } = job;
+  const { fresh: _fresh, dir: _dir, outDir: _outDir, ...view } = job;
   const position = queue.indexOf(job.id);
   return { ...view, queuePosition: position >= 0 ? position + 1 : null };
 }
 
-/** Files a job may serve: only its own screenshots. */
+/** Files a job may serve: its own screenshots and, once rendered, its outputs. */
 export function jobFile(job: Job, name: string): string | null {
   const shots = job.result?.capture.screenshots ?? [];
-  if (!job.dir || !shots.some((s) => s.file === name)) return null;
-  return `${job.dir}/${name}`;
+  if (job.dir && shots.some((s) => s.file === name)) return path.join(job.dir, name);
+  if (job.result?.trailer && OUTPUT_FILES.has(name)) return path.join(job.outDir, name);
+  return null;
 }
 
 function pump(): void {
@@ -192,14 +202,46 @@ async function run(job: Job): Promise<void> {
         outputTokens: attempt?.usage?.outputTokens ?? 0,
         fallbackRan: attempt?.fallbackRan ?? false,
       },
+      trailer: null,
+    };
+    touch(job);
+
+    // The storyboard is visible from here; the trailer follows.
+    const trailer = await makeTrailer(stored, result.plan, job.outDir, {
+      onStepStart: (key, detail) => {
+        current = key;
+        startStep(job, key, detail);
+      },
+      onStepProgress: (key, detail) => {
+        if (key === current) step(job, key).detail = detail;
+        touch(job);
+      },
+      onStepDone: (key, detail) => finishStep(job, key, "done", detail),
+    });
+    job.result.trailer = {
+      video: path.basename(trailer.video),
+      thumbnails: trailer.thumbnails.map((t) => path.basename(t)),
+      captions: path.basename(trailer.captions),
+      duration: trailer.duration,
+      shotsFilmed: trailer.shotsFilmed,
+      shotsSkipped: trailer.shotsSkipped,
     };
     job.status = "done";
     touch(job);
   } catch (err) {
+    // `current` is also set inside the pipeline callbacks, which narrowing does not see.
+    const failedStep = current as StepKey;
     const known = err instanceof CaptureError || err instanceof UnsafeUrlError;
-    const message = known && err instanceof Error ? err.message : "Something went wrong while making this trailer.";
+    const message =
+      known && err instanceof Error
+        ? err.message
+        : err instanceof VoiceError
+          ? `The narrator could not record the voiceover (${err.message}).`
+          : failedStep === "record" || failedStep === "render"
+            ? `The ${failedStep === "record" ? "shoot" : "final cut"} failed. The storyboard below is still ready.`
+            : "Something went wrong while making this trailer.";
     if (!known) console.error(`job ${job.id.slice(0, 8)} failed:`, err);
-    finishStep(job, current, "failed", message);
+    finishStep(job, failedStep, "failed", message);
     job.error = message;
     job.status = "failed";
     touch(job);

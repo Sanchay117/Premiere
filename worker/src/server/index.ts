@@ -10,6 +10,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import http from "node:http";
+import path from "node:path";
 import { config } from "../config";
 import { assertPublicUrl, UnsafeUrlError } from "../safety/url-guard";
 import { createJob, getJob, jobFile, toView } from "./jobs";
@@ -20,6 +21,12 @@ const HOST = process.env.WORKER_HOST?.trim() || "127.0.0.1";
 const TOKEN = process.env.WORKER_TOKEN?.trim() || null;
 const PLANNERS: PlannerChoice[] = ["haiku", "sonnet", "opus", "none"];
 const MAX_BODY = 10_000;
+const CONTENT_TYPES: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".mp4": "video/mp4",
+  ".srt": "application/x-subrip; charset=utf-8",
+};
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
@@ -51,7 +58,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const { pathname } = new URL(req.url ?? "/", "http://worker");
 
   if (req.method === "GET" && pathname === "/health") {
-    return send(res, 200, { ok: true, claude: Boolean(config.apiKey), model: config.model });
+    return send(res, 200, { ok: true, claude: Boolean(config.apiKey), voice: Boolean(config.deepgramKey), model: config.model });
   }
 
   if (req.method === "POST" && pathname === "/jobs") {
@@ -84,15 +91,33 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const fileMatch = pathname.match(/^\/jobs\/([0-9a-f-]{36})\/files\/([\w.-]+)$/);
   if (req.method === "GET" && fileMatch) {
     const job = getJob(fileMatch[1]!);
-    const file = job ? jobFile(job, fileMatch[2]!) : null;
+    const name = fileMatch[2]!;
+    const file = job ? jobFile(job, name) : null;
     if (!file) return send(res, 404, { error: "Not found" });
     const info = await stat(file).catch(() => null);
     if (!info) return send(res, 404, { error: "Not found" });
-    res.writeHead(200, {
-      "content-type": "image/jpeg",
-      "content-length": info.size,
+    const headers: http.OutgoingHttpHeaders = {
+      "content-type": CONTENT_TYPES[path.extname(name)] ?? "application/octet-stream",
+      "accept-ranges": "bytes",
       "cache-control": "private, max-age=3600",
-    });
+    };
+    if (new URL(req.url ?? "/", "http://worker").searchParams.has("download")) {
+      headers["content-disposition"] = `attachment; filename="${name}"`;
+    }
+    // Byte ranges, so the video player can seek.
+    const range = req.headers.range?.match(/^bytes=(\d*)-(\d*)$/);
+    if (range && (range[1] || range[2])) {
+      const start = range[1] ? Number(range[1]) : Math.max(0, info.size - Number(range[2]));
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), info.size - 1) : info.size - 1;
+      if (start > end || start >= info.size) {
+        res.writeHead(416, { "content-range": `bytes */${info.size}` }).end();
+        return;
+      }
+      res.writeHead(206, { ...headers, "content-range": `bytes ${start}-${end}/${info.size}`, "content-length": end - start + 1 });
+      createReadStream(file, { start, end }).pipe(res);
+      return;
+    }
+    res.writeHead(200, { ...headers, "content-length": info.size });
     createReadStream(file).pipe(res);
     return;
   }

@@ -100,10 +100,10 @@ export function Storyboard({ job }: { job: JobView }) {
 
   return (
     <motion.section initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} className="mt-16">
-      <p className="eyebrow">Storyboard preview</p>
+      <p className="eyebrow">{result.trailer ? "How it was planned" : job.status === "running" ? "Storyboard, while the trailer is made" : "Storyboard preview"}</p>
       <h2 className="mt-3 font-serif text-[clamp(2.2rem,5vw,4rem)] leading-none">
         {plan.appName}
-        <em className="text-cream-dim">, the trailer</em>
+        <em className="text-cream-dim">, the storyboard</em>
       </h2>
       {plan.tagline && <p className="mt-3 font-serif text-2xl italic text-amber">{plan.tagline}</p>}
 

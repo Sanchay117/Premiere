@@ -3,7 +3,7 @@
 import type { Plan } from "../planner/schema";
 
 export type PlannerChoice = "haiku" | "sonnet" | "opus" | "none";
-export type StepKey = "capture" | "plan" | "record" | "voice" | "render";
+export type StepKey = "capture" | "plan" | "voice" | "record" | "render";
 export type StepStatus = "pending" | "active" | "done" | "failed" | "soon";
 
 export interface JobStepView {
@@ -42,6 +42,15 @@ export interface JobResultView {
     outputTokens: number;
     fallbackRan: boolean;
   };
+  /** Set once the trailer is rendered. File names are served under /jobs/:id/files/. */
+  trailer: {
+    video: string;
+    thumbnails: string[];
+    captions: string;
+    duration: number;
+    shotsFilmed: number;
+    shotsSkipped: { index: number; reason: string }[];
+  } | null;
 }
 
 export interface JobView {

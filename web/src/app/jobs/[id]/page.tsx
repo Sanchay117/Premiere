@@ -8,6 +8,7 @@ import { NightSky } from "@/components/drivein/NightSky";
 import { LetterboxOpen } from "@/components/hero/Letterbox";
 import { FilmStrip } from "@/components/job/FilmStrip";
 import { Storyboard } from "@/components/job/Storyboard";
+import { TrailerReady } from "@/components/job/TrailerReady";
 import { useJob } from "@/components/job/useJob";
 import { plannerName } from "@/lib/types";
 
@@ -31,7 +32,9 @@ export default function JobPage() {
       : job.status === "running"
         ? "Rolling"
         : job.status === "done"
-          ? "Storyboard ready"
+          ? job.result?.trailer
+            ? "Trailer ready"
+            : "Storyboard ready"
           : "Stopped";
 
   return (
@@ -98,6 +101,7 @@ export default function JobPage() {
             </div>
           )}
 
+          {job?.result?.trailer && <TrailerReady job={job} />}
           {job?.result && <Storyboard job={job} />}
         </div>
       </main>

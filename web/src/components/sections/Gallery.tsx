@@ -55,8 +55,11 @@ export function EmptyLobby() {
   );
 }
 
+/** Lobby cards on the home page: four rows of three; the lobby page hangs every one. */
+const HOME_CARDS = 12;
+
 export function Gallery({ entries }: { entries: GalleryEntry[] }) {
-  const shown = entries.slice(0, 6);
+  const shown = entries.slice(0, HOME_CARDS);
   return (
     <section id="gallery" className="relative scroll-mt-24 py-24 md:py-28">
       <div className="mx-auto max-w-7xl px-5 md:px-8">
@@ -69,11 +72,6 @@ export function Gallery({ entries }: { entries: GalleryEntry[] }) {
             </h2>
             <p className="mt-4 max-w-xl text-lg leading-relaxed text-cream-dim">Trailers Premiere made for other apps, hung here by the people who ordered them.</p>
           </div>
-          {entries.length > shown.length && (
-            <Link href="/gallery" className="font-mono text-[13px] font-bold uppercase tracking-[0.14em] text-amber hover:underline">
-              The whole lobby, {entries.length} trailers
-            </Link>
-          )}
         </div>
         <div className="mt-12">
           {shown.length === 0 ? (
@@ -84,6 +82,15 @@ export function Gallery({ entries }: { entries: GalleryEntry[] }) {
                 <LobbyCard key={entry.id} entry={entry} i={i} />
               ))}
             </div>
+          )}
+          {entries.length > shown.length && (
+            <Link
+              href="/gallery"
+              className="ticket group mt-12 inline-flex items-center gap-3 rounded-xl border border-line-strong bg-ink-2/80 px-5 py-3 transition hover:border-amber/70"
+            >
+              <span className="font-display text-2xl leading-none tracking-[0.05em] text-cream group-hover:text-amber">THE WHOLE LOBBY</span>
+              <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-cream-faint">All {entries.length} trailers</span>
+            </Link>
           )}
         </div>
       </div>

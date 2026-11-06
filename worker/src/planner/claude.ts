@@ -7,13 +7,22 @@ import { config, type Effort, type ModelId } from "../config";
 import type { StoredCapture } from "../capture/types";
 import type { SpendLedger } from "./budget";
 import { PLAN_JSON_SCHEMA } from "./json-schema";
-import { costUsd, worstCaseUsd, type TokenUsage } from "./pricing";
+import { responseCostUsd, worstCaseUsd, type TokenUsage } from "./pricing";
 import { buildUserContent, SYSTEM_PROMPT } from "./prompt";
 import { PlanSchema, type Plan } from "./schema";
 
 const MAX_TOKENS = 16_000;
 /** Generous estimate of one planner prompt (four screenshots plus the element list). */
 const PROMPT_TOKENS_ESTIMATE = 10_000;
+
+/**
+ * Models that support the server-side refusal fallback (`fallbacks: "default"`). For Sonnet 5.5 it
+ * retries cyber and frontier_llm declines on Sonnet 5, at the same price, inside the same call.
+ * That matters for apps about security tools, whose pages can trip the cyber classifier.
+ * Haiku 5.5 has no server-side fallback.
+ */
+const SERVER_FALLBACK = new Set<ModelId>(["claude-sonnet-5-5", "claude-opus-5-5"]);
+const SERVER_FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 export type ClaudeFailure = "no_api_key" | "budget" | "refusal" | "max_tokens" | "invalid_output" | "api_error";
 
@@ -24,6 +33,9 @@ export interface ClaudeAttempt {
   failure: ClaudeFailure | null;
   detail: string | null;
   stopReason: string | null;
+  /** Model that produced the returned message (differs from `model` after a refusal fallback). */
+  servedBy: string | null;
+  fallbackRan: boolean;
   usage: TokenUsage | null;
   costUsd: number;
   latencyMs: number;
@@ -68,6 +80,8 @@ export async function planWithClaude(
     failure: null,
     detail: null,
     stopReason: null,
+    servedBy: null,
+    fallbackRan: false,
     usage: null,
     costUsd: 0,
     latencyMs: 0,
@@ -85,15 +99,17 @@ export async function planWithClaude(
     };
   }
 
+  const serverFallback = SERVER_FALLBACK.has(model);
   const started = Date.now();
-  let response: Anthropic.Message;
+  let response: Anthropic.Beta.BetaMessage;
   try {
-    response = await getClient(config.apiKey).messages.create({
+    response = await getClient(config.apiKey).beta.messages.create({
       model,
       max_tokens: MAX_TOKENS,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: await buildUserContent(stored) }],
       output_config: { effort, format: { type: "json_schema", schema: PLAN_JSON_SCHEMA } },
+      ...(serverFallback ? { betas: [SERVER_FALLBACK_BETA], fallbacks: "default" as const } : {}),
     });
   } catch (err) {
     const latencyMs = Date.now() - started;
@@ -102,26 +118,32 @@ export async function planWithClaude(
   }
 
   const latencyMs = Date.now() - started;
-  const usage: TokenUsage = {
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
-    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+  const { costUsd, usage } = responseCostUsd(model, response.usage);
+  await ledger.record(costUsd);
+  const fallbackRan = (response.usage.iterations ?? []).some((it) => it.type === "fallback_message");
+  const result: ClaudeAttempt = {
+    ...base,
+    usage,
+    costUsd,
+    latencyMs,
+    stopReason: response.stop_reason,
+    servedBy: response.model,
+    fallbackRan,
   };
-  const cost = costUsd(model, usage);
-  await ledger.record(cost);
-  const result: ClaudeAttempt = { ...base, usage, costUsd: cost, latencyMs, stopReason: response.stop_reason };
 
   if (response.stop_reason === "refusal") {
     const category = response.stop_details?.category ?? "unspecified";
-    return { ...result, failure: "refusal", detail: `refused (${category})` };
+    return { ...result, failure: "refusal", detail: `refused (${category})${fallbackRan ? ", fallback model too" : ""}` };
   }
   if (response.stop_reason === "max_tokens") {
     return { ...result, failure: "max_tokens", detail: `hit max_tokens (${MAX_TOKENS})` };
   }
 
+  // Only text after the last fallback marker belongs to the answering model.
+  const lastFallback = response.content.map((b) => b.type).lastIndexOf("fallback");
   const text = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .slice(lastFallback + 1)
+    .filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === "text")
     .map((block) => block.text)
     .join("");
   let json: unknown;

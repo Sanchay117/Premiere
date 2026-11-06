@@ -98,7 +98,7 @@ npm workspaces, Node 22 or later (developed on Node 26). Root scripts forward to
 1. **Capture (no AI).** Playwright opens the URL at 1920×1080 and collects the title, meta description, headings, every clickable element (with a stable id), and 3 or 4 screenshots downscaled to about 1024 px wide. Dismiss cookie banners. If the app is behind a login, stay on the public pages.
 2. **Plan (one AI call).** Claude returns a JSON shot list: ordered actions (click, scroll, type, hover, wait) that target element ids, with one narration line per shot, a title card and a closing call to action. About 110 words of narration for 45 seconds. Validate the output against the schema; if it fails, use the fallback planner.
 3. **Record (no AI).** Playwright replays the shot list while recording. Each step has a timeout, a failed step is skipped, and the whole recording has a hard time cap.
-4. **Voice.** Deepgram Aura-2 for narration, with word timestamps for captions. Fallback: Kokoro, an open-source voice model that runs on the worker.
+4. **Voice.** Deepgram Aura-2 for narration, with word timestamps for captions (key: `DEEPGRAM_KEY` in `.env`). Fallback: Kokoro, an open-source voice model that runs on the worker.
 5. **Music and sound.** Synthesized from code, so nothing needs a license.
 6. **Render.** Remotion composition: title card, footage clips with gentle zoom toward each clicked element, captions timed to the words, end card with the app's URL and "Made with Premiere". A `<Still>` composition renders the thumbnails. Then master the loudness.
 

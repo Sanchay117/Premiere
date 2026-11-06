@@ -65,6 +65,8 @@ export const config = {
   model: resolveModel(process.env.PLANNER_MODEL?.trim() || "haiku"),
   effort: parseChoice(process.env.PLANNER_EFFORT, EFFORTS, "low", "PLANNER_EFFORT"),
   monthlyBudgetUsd: parseNumber(process.env.PLANNER_MONTHLY_BUDGET_USD, 5, "PLANNER_MONTHLY_BUDGET_USD"),
+  /** Deepgram key for narration (Aura-2 text to speech). Missing key means the Kokoro fallback voice. */
+  deepgramKey: process.env.DEEPGRAM_KEY?.trim() || null,
   dataDir: path.resolve(process.env.PREMIERE_DATA_DIR?.trim() || path.join(WORKER_ROOT, ".data")),
   fixturesDir: path.join(WORKER_ROOT, "fixtures"),
 };

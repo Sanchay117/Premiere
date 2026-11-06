@@ -1,14 +1,27 @@
-// Mirrors worker/src/server/types.ts (the job server's response). Keep the two in sync.
+// Mirrors worker/src/server/types.ts (the job server's response) and worker/src/options.ts.
+// Keep them in sync.
 
 export type PlannerChoice = "haiku" | "sonnet" | "opus" | "none";
 export type StepKey = "capture" | "plan" | "voice" | "record" | "render";
 export type StepStatus = "pending" | "active" | "done" | "failed" | "soon";
+export type TrailerStyle = "hype" | "walkthrough";
+export type CaptionStyle = "karaoke" | "boxed" | "bold" | "off";
+export type Narrator = "atlas" | "zeus" | "asteria" | "thalia" | "ophelia" | "athena" | "draco" | "pandora";
+export type VoiceChoice = "auto" | Narrator;
+
+export interface TrailerOptions {
+  style: TrailerStyle;
+  voice: VoiceChoice;
+  captions: CaptionStyle;
+}
 
 export interface Shot {
   action: "click" | "hover" | "type" | "scroll" | "wait";
   target: string | null;
   text: string | null;
   narration: string;
+  /** On-screen title for the shot (1 to 4 words). Older plans may not have one. */
+  punch?: string;
 }
 
 export interface Plan {
@@ -71,6 +84,7 @@ export interface JobResultView {
     duration: number;
     shotsFilmed: number;
     shotsSkipped: { index: number; reason: string }[];
+    narrator?: string;
   } | null;
 }
 
@@ -85,12 +99,37 @@ export interface JobView {
   steps: JobStepView[];
   error: string | null;
   result: JobResultView | null;
+  /** Missing on jobs made before options existed. */
+  options?: TrailerOptions;
+  gallery?: boolean;
+}
+
+export interface GalleryEntry {
+  id: string;
+  appName: string;
+  tagline: string;
+  host: string;
+  url: string;
+  duration: number;
+  style: string;
+  narrator: string;
+  createdAt: string;
+}
+
+export interface Pricing {
+  free: boolean;
+  mode: "off" | "testnet" | "mainnet";
+  priceUsd: number;
+  network: string | null;
+  networkName: string | null;
+  payTo: string | null;
+  asset: string | null;
 }
 
 export const PLANNERS: { id: PlannerChoice; name: string; family: string; blurb: string; cost: string; tag?: string }[] = [
-  { id: "haiku", name: "Haiku", family: "Claude Haiku 5.5", blurb: "Quickest draft", cost: "~$0.001" },
   { id: "sonnet", name: "Sonnet", family: "Claude Sonnet 5.5", blurb: "Vivid, grounded scripts", cost: "~$0.015", tag: "Our pick" },
   { id: "opus", name: "Opus", family: "Claude Opus 5.5", blurb: "Tightest edit", cost: "~$0.03" },
+  { id: "haiku", name: "Haiku", family: "Claude Haiku 5.5", blurb: "Quickest draft", cost: "~$0.001" },
   { id: "none", name: "No AI", family: "Free planner", blurb: "Script from the page's own words", cost: "$0" },
 ];
 

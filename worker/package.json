@@ -14,13 +14,16 @@
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "gallery": "tsx src/cli/gallery.ts",
-    "voice-samples": "tsx src/cli/voice-samples.ts"
+    "voice-samples": "tsx src/cli/voice-samples.ts",
+    "payments": "tsx src/cli/payments.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
     "@remotion/bundler": "^4.0.541",
     "@remotion/google-fonts": "^4.0.541",
     "@remotion/renderer": "^4.0.541",
+    "@x402/core": "^2.30.0",
+    "@x402/evm": "^2.30.0",
     "playwright": "^1.65.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -4,6 +4,9 @@
 //   GET  /jobs/:id                -> JobView (live, or read back from the job's job.json)
 //   GET  /jobs/:id/files/:name    -> a screenshot, or the trailer, thumbnails and captions once rendered
 //   GET  /gallery                 -> approved trailers whose makers opted in, newest first
+//   GET  /pricing                 -> free, or the price, network and receiving address
+//   POST /x402/trailers           { url, style?, voice?, captions? } -> 202 { id, status, page }; with payments
+//                                   on, 402 + PAYMENT-REQUIRED until it carries a PAYMENT-SIGNATURE
 //   GET  /health
 // Binds to 127.0.0.1 by default. Set WORKER_TOKEN (here and in the web app) before exposing it.
 
@@ -15,6 +18,7 @@ import path from "node:path";
 import { config } from "../config";
 import { assertPublicUrl, UnsafeUrlError } from "../safety/url-guard";
 import { parseOptions, type TrailerOptions } from "../options";
+import { charge, paymentConfig, paymentsEnabled, pricing } from "../payments";
 import { accessRequired, admit } from "./access";
 import { galleryEntries } from "./gallery";
 import { createJob, findJob, jobFile, toView } from "./jobs";
@@ -74,6 +78,7 @@ async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
 /** The web app forwards a hashed visitor id; direct callers fall back to their socket address. */
 const visitorOf = (req: http.IncomingMessage) => String(req.headers["x-visitor"] ?? req.socket.remoteAddress ?? "unknown").slice(0, 128);
 
+const jobLinks = (id: string) => ({ id, status: `${paymentConfig.publicUrl}/api/jobs/${id}`, page: `${paymentConfig.publicUrl}/jobs/${id}` });
 
 function authorized(req: http.IncomingMessage): boolean {
   if (!TOKEN) return true;
@@ -102,15 +107,42 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     return send(res, 200, { ok: true, claude: Boolean(config.apiKey), voice: Boolean(config.deepgramKey), model: config.model, accessRequired });
   }
 
-  // The website's box office: free trailers within the daily limits.
+  if (req.method === "GET" && pathname === "/pricing") {
+    return send(res, 200, pricing());
+  }
+
+  // The website's box office. While trailers are free it admits within the daily limits; once
+  // payments are on, people pay through the x402 route below instead.
   if (req.method === "POST" && pathname === "/jobs") {
     const order = await readJobRequest(req);
     if (!order.ok) return send(res, order.status, { error: order.error });
+    if (paymentsEnabled()) {
+      return send(res, 402, { error: `A trailer costs $${paymentConfig.priceUsd} in USDC. Pay with your wallet below.`, payment: true });
+    }
     const decision = await admit(order.code, visitorOf(req));
     if (!decision.ok) return send(res, 403, { error: decision.reason, needsCode: decision.needsCode ?? false });
     const job = createJob(order.url.href, order.planner, order.fresh, order.options, order.gallery);
     console.log(`job ${job.id.slice(0, 8)} admitted${decision.code ? ` with code ${decision.code}` : ""}`);
     return send(res, 202, { id: job.id });
+  }
+
+  // One request orders a trailer: for agents, and for people paying from the website.
+  if (req.method === "POST" && pathname === "/x402/trailers") {
+    const order = await readJobRequest(req);
+    if (!order.ok) return send(res, order.status, { error: order.error });
+    if (!paymentsEnabled()) {
+      const decision = await admit(order.code, visitorOf(req));
+      if (!decision.ok) return send(res, 403, { error: decision.reason });
+      const job = createJob(order.url.href, order.planner, false, order.options, order.gallery);
+      console.log(`job ${job.id.slice(0, 8)} ordered over x402 (free)`);
+      return send(res, 202, { ...jobLinks(job.id), free: true, note: "Trailers are free until Vibestarter Vibeathon 02 ends." });
+    }
+    const signature = req.headers["payment-signature"];
+    const paid = await charge(typeof signature === "string" ? signature : undefined);
+    if (!paid.ok) return send(res, paid.status, { error: paid.error }, paid.headers);
+    const job = createJob(order.url.href, order.planner, false, order.options, order.gallery);
+    console.log(`job ${job.id.slice(0, 8)} paid by ${paid.payer}, tx ${paid.transaction}`);
+    return send(res, 202, { ...jobLinks(job.id), free: false, transaction: paid.transaction }, paid.headers);
   }
 
   const jobMatch = pathname.match(/^\/jobs\/([0-9a-f-]{36})$/);

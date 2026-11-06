@@ -15,6 +15,7 @@ next-env.d.ts
 out/
 dist/
 .vercel/
+*.tsbuildinfo
 
 # OS and editor noise
 .DS_Store

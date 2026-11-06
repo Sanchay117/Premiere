@@ -3,7 +3,7 @@
 
 import type { Capture, CapturedElement } from "../capture/types";
 import { asSentence, sanitizeScript, truncateWords } from "../lib/text";
-import { appNameFrom, DESTRUCTIVE_TEXT } from "./fallback";
+import { appNameFrom, DESTRUCTIVE_TEXT, LOGIN_TEXT } from "./fallback";
 import { planWords, WORDS_TARGET, type Plan, type Shot } from "./schema";
 
 const MIN_SHOTS = 3;
@@ -23,6 +23,7 @@ function clickBlockReason(el: CapturedElement): string | null {
   if (el.href && /^(mailto|tel|sms):/i.test(el.href)) return "is a mailto or tel link";
   if (el.external) return "leaves the site";
   if (DESTRUCTIVE_TEXT.test(el.text)) return "looks destructive";
+  if (LOGIN_TEXT.test(el.text)) return "opens a login form";
   return null;
 }
 
@@ -44,6 +45,12 @@ export function validatePlan(raw: Plan, capture: Capture): Validation {
     switch (rawShot.action) {
       case "click":
       case "hover": {
+        if (!el && target && sections.has(target)) {
+          // Models sometimes aim at a heading; showing that section is what they meant.
+          issues.push(`shot ${n}: ${rawShot.action} on section ${target}, scrolling to it instead`);
+          shot.action = "scroll";
+          break;
+        }
         if (!el) {
           issues.push(`shot ${n}: ${rawShot.action} on unknown element ${target ?? "(none)"}, dropped`);
           return;

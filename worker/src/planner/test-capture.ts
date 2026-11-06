@@ -48,6 +48,7 @@ export function testCapture(): Capture {
       element("e6", "button", "Log out"),
       element("e7", "link", "Try the demo", { href: "https://example-app.test/demo", navigates: true }),
       element("e8", "link", "Contact", { href: "mailto:hi@example-app.test", region: "footer", aboveFold: false }),
+      element("e9", "link", "Log in", { region: "nav", href: "https://example-app.test/login", navigates: true }),
     ],
     sections: [
       { id: "s1", heading: "Clean up messy notes in seconds", level: 1, text: "Paste anything. Tidy does the rest.", y: 300 },

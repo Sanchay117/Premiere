@@ -4,7 +4,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Capture, StoredCapture } from "../capture/types";
 
 /** Bump when the prompt or schema changes, so cached plans are not reused. */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 export const SYSTEM_PROMPT = `You direct launch trailers for Premiere. Premiere turns a web app into a 45 second trailer built from real screen recordings of the app, with a voiceover, captions and music.
 
@@ -19,11 +19,12 @@ Plan the trailer as a shot list. A browser replays your shots in order at 1920x1
 
 Shots
 - Use 5 to 8 shots. Each shot is one action followed by a short hold while its narration plays.
-- click, hover and type must target an element id from the list. scroll may target an element or section id, or use null to scroll down most of a screen. wait holds on the current view and has a null target.
+- click, hover and type must target an element id (e12) from the list. Section ids (s3) are only for scroll. scroll may target an element or section id, or use null to scroll down most of a screen. wait holds on the current view and has a null target.
 - Choose actions that make something visible happen: switching tabs, opening an interactive demo, typing a realistic example into the app's main input and running it, hovering a feature card, scrolling to a strong section. Showing the product working beats scrolling past marketing copy.
 - Element ids describe the landing page only. A click that opens another page is fine, and the footage will show that page, but the ids do not apply there. After such a click, use scroll or wait, or target landing page elements again (the browser returns to the landing page by itself).
-- Never type into password, email, phone or payment fields. Never sign up, log in, buy, connect a wallet, delete, post or send anything. Only type into search boxes or the app's own input, with a short, harmless example.
-- Do not click external links, or mailto and tel links.
+- Never type into password, email, phone or payment fields. Never sign up, log in, buy, connect a wallet, delete, post or send anything. Only type into search boxes or the app's own input.
+- When you type, use a short, harmless, realistic value that gives a real result when submitted, such as the app's own address or another well-known public website for a URL field, or a sensible query for a search box. Never type the field's placeholder text. Follow it with the click that submits it, so the footage shows the result.
+- Do not click log in or sign in buttons, external links, or mailto and tel links.
 - Tell a story: what the app is, its main flow, one or two standout features, then the invitation to try it.
 
 Narration

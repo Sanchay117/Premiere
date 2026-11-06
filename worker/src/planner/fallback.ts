@@ -17,6 +17,8 @@ const CTA_TEXT =
   /get started|start|try|sign ?up|join|launch|open (the )?app|create|generate|build|demo|explore|book|request|claim|play|upload|begin|go to app|free|scan|run/i;
 export const DESTRUCTIVE_TEXT =
   /log\s?out|sign\s?out|delete|unsubscribe|deactivate|remove account|cancel (my )?(subscription|account|plan)/i;
+/** Login buttons lead to credential forms, which make empty footage. */
+export const LOGIN_TEXT = /\b(log\s?in|sign\s?in)\b/i;
 const DANGLING_END = /\s+(that|which|and|or|but|so|the|a|an|to|of|with|for|in|on|by|your|our|their|its|is|are|from|at|as|while)$/i;
 const MAX_LINE_WORDS = 18;
 const FILLER = [
@@ -86,7 +88,7 @@ export function primaryCta(c: Capture): CapturedElement | null {
   let bestScore = -Infinity;
   for (const e of c.elements) {
     if (e.kind !== "button" && e.kind !== "link") continue;
-    if (e.external || e.sensitive || DESTRUCTIVE_TEXT.test(e.text)) continue;
+    if (e.external || e.sensitive || DESTRUCTIVE_TEXT.test(e.text) || LOGIN_TEXT.test(e.text)) continue;
     if (e.href && /^(mailto|tel|sms):/i.test(e.href)) continue;
     if (e.text.toLowerCase() === name) continue; // logo link
     const ctaText = CTA_TEXT.test(e.text) && e.text.length <= 40;

@@ -52,6 +52,28 @@ test("keeps valid shots and drops unsafe or unknown ones", () => {
   assert.ok(v.issues.some((i) => i.includes("destructive")));
 });
 
+test("turns hovers on section ids into scrolls and drops login clicks", () => {
+  const v = validatePlan(
+    plan([
+      { action: "hover", target: "s2", text: null, narration },
+      { action: "click", target: "s3", text: null, narration },
+      { action: "click", target: "e9", text: null, narration }, // "Log in"
+      { action: "hover", target: "e9", text: null, narration }, // hovering is harmless
+      { action: "type", target: "s4", text: "notes", narration }, // cannot type into a section
+    ]),
+    testCapture(),
+  );
+  assert.deepEqual(
+    v.plan.shots.map((s) => [s.action, s.target]),
+    [
+      ["scroll", "s2"],
+      ["scroll", "s3"],
+      ["hover", "e9"],
+    ],
+  );
+  assert.ok(v.issues.some((i) => i.includes("login form")));
+});
+
 test("removes em dashes from narration and titles", () => {
   const v = validatePlan(
     {

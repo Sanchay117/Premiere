@@ -9,8 +9,10 @@ import { planWords, WORDS_TARGET, type Plan, type PlanInput, type Shot } from ".
 
 const MIN_SHOTS = 3;
 const MAX_SHOTS = 10;
-/** Outside this range the trailer would be badly short or long, so the plan is rejected. */
-const WORDS_HARD = { min: 60, max: 170 };
+/** Outside this range the trailer would be badly short or long, so the plan is rejected. The floor
+ *  sits well under every style's target (hype aims for 55 to 85 words): a floor of 60 once threw
+ *  away good 55 to 59 word hype scripts without saying why. */
+export const WORDS_HARD = { min: 40, max: 170 };
 
 export interface Validation {
   plan: Plan;
@@ -128,7 +130,9 @@ export function validatePlan(raw: PlanInput, capture: Capture, style: TrailerSty
   if (!plan.close) issues.push("missing close");
   if (shots.length < MIN_SHOTS) issues.push(`only ${shots.length} usable shots`);
   const target = WORDS_TARGET[style];
-  if (words < target.min || words > target.max) {
+  if (words < WORDS_HARD.min || words > WORDS_HARD.max) {
+    issues.push(`${words} narration words, outside the ${WORDS_HARD.min} to ${WORDS_HARD.max} a trailer needs`);
+  } else if (words < target.min || words > target.max) {
     issues.push(`${words} narration words (target ${target.min} to ${target.max})`);
   }
   const usable =

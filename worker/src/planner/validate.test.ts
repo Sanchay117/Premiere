@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EM_DASH } from "../lib/text";
-import type { PlanInput as Plan } from "./schema";
+import { WORDS_TARGET, type PlanInput as Plan } from "./schema";
 import { testCapture } from "./test-capture";
-import { validatePlan } from "./validate";
+import { validatePlan, WORDS_HARD } from "./validate";
 
 const narration = "This line has exactly thirteen words so the totals stay easy to check.";
 
@@ -94,6 +94,26 @@ test("removes em dashes from narration and titles", () => {
 test("rejects plans that would make a badly short trailer", () => {
   const v = validatePlan(plan([{ action: "scroll", target: null, text: null, narration: "Short." }]), testCapture());
   assert.equal(v.usable, false);
+});
+
+test("every style's word target clears the hard floor, and a rejection says why", () => {
+  for (const [style, target] of Object.entries(WORDS_TARGET)) {
+    assert.ok(target.min > WORDS_HARD.min, `${style} target starts at ${target.min}, under the floor`);
+  }
+  // A tight 56-word hype script (Opus wrote one for Fundable) is fine.
+  const hype = validatePlan(
+    {
+      ...plan(Array.from({ length: 6 }, () => ({ action: "scroll" as const, target: null, text: null, narration: "Seven words in every single line, really." }))),
+      hook: "Is your app worth backing today?",
+      close: "Find out at the link below right now.",
+    },
+    testCapture(),
+    "hype",
+  );
+  assert.equal(hype.words, 6 * 7 + 6 + 8);
+  assert.equal(hype.usable, true);
+  const short = validatePlan(plan([{ action: "scroll", target: null, text: null, narration: "Short." }]), testCapture());
+  assert.ok(short.issues.some((issue) => issue.includes("a trailer needs")), short.issues.join("; "));
 });
 
 test("accepts a full plan near the word target", () => {

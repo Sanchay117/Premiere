@@ -12,10 +12,17 @@ const franklin = Libre_Franklin({ subsets: ["latin"], variable: "--font-franklin
 const courier = Courier_Prime({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-courier", display: "swap" });
 const marker = Permanent_Marker({ subsets: ["latin"], weight: "400", variable: "--font-marker-hand", display: "swap" });
 
+const description =
+  "An AI agent opens your app, clicks through its main flow, writes a script and records real footage, then returns a 45 second narrated trailer with captions, music and thumbnails.";
+
 export const metadata: Metadata = {
+  // Link previews need absolute URLs. SITE_URL names the public address; on Vercel, Next falls
+  // back to the production domain by itself.
+  metadataBase: process.env.SITE_URL ? new URL(process.env.SITE_URL) : undefined,
   title: "Premiere: paste a URL, get a launch trailer",
-  description:
-    "An AI agent opens your app, clicks through its main flow, writes a script and records real footage, then returns a 45 second narrated trailer with captions, music and thumbnails.",
+  description,
+  openGraph: { type: "website", siteName: "Premiere", title: "Premiere: paste a URL, get a launch trailer", description },
+  twitter: { card: "summary_large_image", title: "Premiere: paste a URL, get a launch trailer", description },
 };
 
 export const viewport: Viewport = {

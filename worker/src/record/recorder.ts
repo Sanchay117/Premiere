@@ -13,6 +13,8 @@ import { launchSafeBrowser, newSafeContext } from "../safety/browser";
 import { assertPublicUrl } from "../safety/url-guard";
 
 export const FRAME = { width: 1920, height: 1080 } as const;
+/** Device pixels per CSS pixel in the footage (frames are 2880x1620; boxes stay in CSS pixels). */
+export const PIXEL_DENSITY = 1.5;
 const LEAD_IN = 0.7;
 const STEP_TIMEOUT = 4000;
 const NAV_SETTLE = 6000;
@@ -121,7 +123,8 @@ export async function recordPlan(capture: Capture, plan: Plan, options: RecordOp
   let writes: Promise<unknown> = Promise.resolve();
   let keyframe: () => Promise<void> = async () => {};
   try {
-    const context: BrowserContext = await newSafeContext(safe.browser, { viewport: FRAME, deviceScaleFactor: 1 });
+    // Filmed at 1.5x pixel density so the render can zoom toward a target without going soft.
+    const context: BrowserContext = await newSafeContext(safe.browser, { viewport: FRAME, deviceScaleFactor: PIXEL_DENSITY });
     const page = await context.newPage();
     context.on("page", (popup) => {
       if (popup !== page) popup.close().catch(() => {});
@@ -157,7 +160,7 @@ export async function recordPlan(capture: Capture, plan: Plan, options: RecordOp
     };
     const startScreencast = () =>
       cdp
-        .send("Page.startScreencast", { format: "jpeg", quality: 86, maxWidth: FRAME.width, maxHeight: FRAME.height, everyNthFrame: 2 })
+        .send("Page.startScreencast", { format: "jpeg", quality: 86, maxWidth: FRAME.width * PIXEL_DENSITY, maxHeight: FRAME.height * PIXEL_DENSITY, everyNthFrame: 2 })
         .catch(() => {});
     await startScreencast();
     page.on("framenavigated", (frame) => {

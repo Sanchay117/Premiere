@@ -26,7 +26,7 @@ export const CONTENT_DWELL_MS = 7000;
 export class CaptureError extends Error {
   constructor(
     message: string,
-    readonly code: "nav_timeout" | "nav_failed" | "blocked" | "dns" | "timeout",
+    readonly code: "nav_timeout" | "nav_failed" | "blocked" | "dns" | "timeout" | "bot_wall",
   ) {
     super(message);
     this.name = "CaptureError";
@@ -168,6 +168,16 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
   progress(`Found ${extracted.elements.length} things to click and ${extracted.sections.length} sections`);
 
   const botWall = BOT_WALL.test(`${extracted.title} ${extracted.textExcerpt.slice(0, 300)}`);
+  // A bot check that also failed the request or left almost nothing on the page means there is
+  // no app to film. Going on would plan and film the check itself under the app's name (Product
+  // Hunt's Cloudflare page did exactly that), so the job stops and says why. The words alone are
+  // not enough: a captcha company's own landing page mentions captchas.
+  if (botWall && (status >= 400 || extracted.elements.length < 5)) {
+    throw new CaptureError(
+      "This site showed a bot check instead of the app, so there is nothing real to film. If it is your app, let headless browsers through, or try a page that is not behind the check.",
+      "bot_wall",
+    );
+  }
   if (botWall) warnings.push("The site showed a bot check or access-denied page instead of the app.");
   if (extracted.loginWall) notes.push("The page shows a login form; the trailer stays on public content.");
   if (extracted.elements.length === 0) warnings.push("No interactive elements were found.");

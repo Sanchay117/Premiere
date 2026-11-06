@@ -17,6 +17,7 @@ import { fallbackPlan } from "../planner/fallback";
 import type { Plan } from "../planner/schema";
 import { writeMockPlan } from "../planner/store";
 import { validatePlan } from "../planner/validate";
+import { DEFAULT_OPTIONS, TRAILER_STYLES, type TrailerStyle } from "../options";
 import { writeReport, type BakeoffRun, type BakeoffSite } from "./bakeoff-report";
 import { fail, seconds, usd } from "./shared";
 
@@ -31,7 +32,7 @@ function scored(planner: string, model: ModelId | null, raw: Plan | null, stored
   if (!raw) {
     return { planner, model, usable: false, plan: null, issues: [], rawShots: 0, keptShots: 0, words: 0, hypeWords: [], emDashes: 0 };
   }
-  const v = validatePlan(raw, stored.capture);
+  const v = validatePlan(raw, stored.capture, style);
   return {
     planner,
     model,
@@ -60,7 +61,7 @@ function runFallback(stored: StoredCapture): BakeoffRun {
 }
 
 async function runModel(stored: StoredCapture, model: ModelId, effort: Effort, ledger: SpendLedger): Promise<BakeoffRun> {
-  const attempt = await planWithClaude(stored, { model, effort, ledger });
+  const attempt = await planWithClaude(stored, { model, effort, ledger, style });
   const result = scored(aliasOf(model), model, attempt.plan, stored);
   return {
     ...result,
@@ -87,8 +88,10 @@ const { values, positionals } = parseArgs({
     effort: { type: "string" },
     recapture: { type: "boolean", default: false },
     "save-mock": { type: "string" },
+    style: { type: "string", default: DEFAULT_OPTIONS.style },
   },
 });
+const style: TrailerStyle = (TRAILER_STYLES as readonly string[]).includes(values.style) ? (values.style as TrailerStyle) : DEFAULT_OPTIONS.style;
 
 try {
   const models = values.models
@@ -139,6 +142,7 @@ try {
   const report = await writeReport(sites, {
     models,
     effort,
+    style,
     spentUsd: after.usd - before.usd,
     dir: path.join(config.dataDir, "bakeoff", new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)),
   });

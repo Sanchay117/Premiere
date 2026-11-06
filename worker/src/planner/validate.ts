@@ -3,8 +3,9 @@
 
 import type { Capture, CapturedElement } from "../capture/types";
 import { asSentence, sanitizeScript, truncateWords } from "../lib/text";
+import { DEFAULT_OPTIONS, type TrailerStyle } from "../options";
 import { appNameFrom, DESTRUCTIVE_TEXT, LOGIN_TEXT } from "./fallback";
-import { planWords, WORDS_TARGET, type Plan, type Shot } from "./schema";
+import { planWords, WORDS_TARGET, type Plan, type PlanInput, type Shot } from "./schema";
 
 const MIN_SHOTS = 3;
 const MAX_SHOTS = 10;
@@ -27,17 +28,26 @@ function clickBlockReason(el: CapturedElement): string | null {
   return null;
 }
 
-export function validatePlan(raw: Plan, capture: Capture): Validation {
+/** A punch title: at most 4 words and 32 characters, cleaned like the rest of the copy. */
+function cleanPunch(text: string | null | undefined): string {
+  const s = sanitizeScript(text ?? "").replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  const short = truncateWords(s, 4);
+  return short.length <= 32 ? short : truncateWords(short, 3).slice(0, 32).trim();
+}
+
+export function validatePlan(raw: PlanInput, capture: Capture, style: TrailerStyle = DEFAULT_OPTIONS.style): Validation {
   const issues: string[] = [];
   const elements = new Map(capture.elements.map((e) => [e.id, e]));
   const sections = new Set(capture.sections.map((s) => s.id));
+  const headings = new Map(capture.sections.map((s) => [s.id, s.heading]));
   const shots: Shot[] = [];
 
   raw.shots.forEach((rawShot, i) => {
     const n = i + 1;
     const target = rawShot.target?.trim().toLowerCase() || null;
     const el = target ? elements.get(target) : undefined;
-    const shot: Shot = { action: rawShot.action, target, text: null, narration: asSentence(rawShot.narration) };
+    const shot: Shot = { action: rawShot.action, target, text: null, narration: asSentence(rawShot.narration), punch: "" };
     if (!shot.narration) {
       issues.push(`shot ${n}: empty narration, dropped`);
       return;
@@ -90,6 +100,9 @@ export function validatePlan(raw: Plan, capture: Capture): Validation {
         shot.target = null;
         break;
     }
+    // Plans from the fallback or saved before punch titles existed get one from the page itself.
+    const label = shot.action === "scroll" ? (shot.target && headings.get(shot.target)) || el?.text : el?.text;
+    shot.punch = cleanPunch(rawShot.punch) || cleanPunch(label) || cleanPunch(truncateWords(shot.narration, 3));
     shots.push(shot);
   });
 
@@ -112,8 +125,9 @@ export function validatePlan(raw: Plan, capture: Capture): Validation {
   if (!plan.hook) issues.push("missing hook");
   if (!plan.close) issues.push("missing close");
   if (shots.length < MIN_SHOTS) issues.push(`only ${shots.length} usable shots`);
-  if (words < WORDS_TARGET.min || words > WORDS_TARGET.max) {
-    issues.push(`${words} narration words (target ${WORDS_TARGET.min} to ${WORDS_TARGET.max})`);
+  const target = WORDS_TARGET[style];
+  if (words < target.min || words > target.max) {
+    issues.push(`${words} narration words (target ${target.min} to ${target.max})`);
   }
   const usable =
     shots.length >= MIN_SHOTS && words >= WORDS_HARD.min && words <= WORDS_HARD.max && !!plan.hook && !!plan.close;

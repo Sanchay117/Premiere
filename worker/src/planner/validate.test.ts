@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EM_DASH } from "../lib/text";
-import type { Plan } from "./schema";
+import type { PlanInput as Plan } from "./schema";
 import { testCapture } from "./test-capture";
 import { validatePlan } from "./validate";
 

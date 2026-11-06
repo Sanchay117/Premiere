@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { aliasOf, config, type Effort, type ModelId } from "../config";
 import type { Capture } from "../capture/types";
+import type { TrailerStyle } from "../options";
 import { urlSlug } from "../lib/url";
 import { PROMPT_VERSION } from "./prompt";
 import { PlanSchema, type Plan } from "./schema";
@@ -22,8 +23,10 @@ export interface SavedPlan {
 }
 
 const slug = (c: Capture) => urlSlug(new URL(c.url));
-/** One cached plan per URL and model, so comparing models never returns another model's plan. */
-const cachePath = (c: Capture, model: ModelId) => path.join(config.dataDir, "plans", `${slug(c)}-${aliasOf(model)}.json`);
+/** One cached plan per URL, model and style, so comparing models never returns another model's
+ *  plan and a hype cut never reuses a walkthrough script. */
+const cachePath = (c: Capture, model: ModelId, style: TrailerStyle) =>
+  path.join(config.dataDir, "plans", `${slug(c)}-${aliasOf(model)}-${style}.json`);
 export const mockPath = (c: Capture) => path.join(config.fixturesDir, "plans", `${slug(c)}.json`);
 
 async function readSaved(file: string): Promise<SavedPlan | null> {
@@ -55,15 +58,16 @@ function toSaved(c: Capture, plan: Plan, meta: Meta): SavedPlan {
   };
 }
 
-/** A cached plan from this model, for this exact capture and prompt version. */
-export async function readCachedPlan(c: Capture, model: ModelId): Promise<SavedPlan | null> {
-  const saved = await readSaved(cachePath(c, model));
+/** A cached plan from this model and style, for this exact capture and prompt version. */
+export async function readCachedPlan(c: Capture, model: ModelId, style: TrailerStyle): Promise<SavedPlan | null> {
+  const saved = await readSaved(cachePath(c, model, style));
   if (!saved || saved.promptVersion !== PROMPT_VERSION || saved.capturedAt !== c.capturedAt) return null;
   return saved;
 }
 
-export function writeCachedPlan(c: Capture, plan: Plan, meta: Meta & { model: ModelId }): Promise<string> {
-  return writeSaved(cachePath(c, meta.model), toSaved(c, plan, meta));
+export function writeCachedPlan(c: Capture, plan: Plan, meta: Meta & { model: ModelId; style: TrailerStyle }): Promise<string> {
+  const { style, ...rest } = meta;
+  return writeSaved(cachePath(c, meta.model, style), toSaved(c, plan, rest));
 }
 
 export function readMockPlan(c: Capture): Promise<SavedPlan | null> {

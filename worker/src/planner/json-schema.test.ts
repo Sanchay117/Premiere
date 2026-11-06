@@ -13,6 +13,6 @@ test("plan schema keeps real enums and strict objects", () => {
   assert.deepEqual(root.properties.mood.enum, ["energetic", "calm", "playful", "bold"]);
   assert.deepEqual(shot.properties.action.enum, ["click", "hover", "type", "scroll", "wait"]);
   assert.deepEqual(shot.properties.target.anyOf, [{ type: "string" }, { type: "null" }]);
-  assert.deepEqual(shot.required, ["action", "target", "text", "narration"]);
-  assert.doesNotMatch(JSON.stringify(root), /minLength|maxLength|minimum|maximum|"type":\[/);
+  assert.deepEqual(shot.required, ["action", "target", "text", "narration", "punch"]);
+  assert.doesNotMatch(JSON.stringify(root), /minLength|maxLength|minimum|maximum|"default"|"type":\[/);
 });

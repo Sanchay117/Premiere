@@ -112,7 +112,7 @@ export function primaryCta(c: Capture): CapturedElement | null {
 function fitWords(plan: Plan, extra: string[]): void {
   let words = planWords(plan);
   for (const shot of plan.shots) {
-    if (words >= WORDS_TARGET.min) break;
+    if (words >= WORDS_TARGET.walkthrough.min) break;
     const room = MAX_LINE_WORDS - countWords(shot.narration);
     if (room < 5) continue;
     const next = extra.shift();
@@ -120,7 +120,7 @@ function fitWords(plan: Plan, extra: string[]): void {
     shot.narration = `${shot.narration} ${line(next, room)}`;
     words = planWords(plan);
   }
-  while (words > WORDS_TARGET.max) {
+  while (words > WORDS_TARGET.walkthrough.max) {
     const longest = plan.shots.reduce((a, b) => (countWords(b.narration) > countWords(a.narration) ? b : a));
     const n = countWords(longest.narration);
     if (n <= 8) break;
@@ -159,8 +159,8 @@ export function fallbackPlan(c: Capture): Plan {
 
   const filler = [...FILLER];
   const nextLine = () => material.shift() ?? filler.shift() ?? "Take a closer look.";
-  const shots: Shot[] = [{ action: "wait", target: null, text: null, narration: line(nextLine()) }];
-  if (cta) shots.push({ action: "hover", target: cta.id, text: null, narration: line(nextLine()) });
+  const shots: Shot[] = [{ action: "wait", target: null, text: null, punch: "", narration: line(nextLine()) }];
+  if (cta) shots.push({ action: "hover", target: cta.id, text: null, punch: "", narration: line(nextLine()) });
 
   if (singleScreen) {
     // Nothing to scroll: show the controls instead.
@@ -175,7 +175,7 @@ export function fallbackPlan(c: Capture): Plan {
     );
     const step = Math.max(1, Math.floor(controls.length / 3));
     for (let i = 0; i < controls.length && shots.length < 5; i += step) {
-      shots.push({ action: "hover", target: controls[i]!.id, text: null, narration: line(nextLine()) });
+      shots.push({ action: "hover", target: controls[i]!.id, text: null, punch: "", narration: line(nextLine()) });
     }
   } else {
     const tour = c.sections
@@ -190,13 +190,13 @@ export function fallbackPlan(c: Capture): Plan {
       })
       .filter((t): t is { id: string; narration: string } => t !== null)
       .slice(0, 3);
-    for (const t of tour) shots.push({ action: "scroll", target: t.id, text: null, narration: t.narration });
+    for (const t of tour) shots.push({ action: "scroll", target: t.id, text: null, punch: "", narration: t.narration });
   }
   while (shots.length < 4) {
-    shots.push({ action: singleScreen ? "wait" : "scroll", target: null, text: null, narration: line(nextLine()) });
+    shots.push({ action: singleScreen ? "wait" : "scroll", target: null, text: null, punch: "", narration: line(nextLine()) });
   }
   if (cta?.navigates) {
-    shots.push({ action: "click", target: cta.id, text: null, narration: line(`One click on ${sentenceCase(cta.text)} and you are in`) });
+    shots.push({ action: "click", target: cta.id, text: null, punch: "", narration: line(`One click on ${sentenceCase(cta.text)} and you are in`) });
   }
 
   const plan: Plan = {

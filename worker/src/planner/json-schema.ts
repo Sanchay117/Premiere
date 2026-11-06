@@ -11,7 +11,8 @@ type JsonSchema = { [key: string]: unknown };
 function strict(node: JsonSchema): JsonSchema {
   const out: JsonSchema = {};
   for (const [key, value] of Object.entries(node)) {
-    if (key === "$schema") continue;
+    // Defaults fill in saved plans on our side; the model always writes the field.
+    if (key === "$schema" || key === "default") continue;
     if (key === "properties") {
       out.properties = Object.fromEntries(
         Object.entries(value as Record<string, JsonSchema>).map(([name, child]) => [name, strict(child)]),

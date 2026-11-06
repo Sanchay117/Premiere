@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { aliasOf, type Effort, type ModelId } from "../config";
 import type { Capture } from "../capture/types";
+import type { TrailerStyle } from "../options";
 import { formatPlan } from "../planner/format";
 import { WORDS_TARGET, type Plan } from "../planner/schema";
 import { seconds, usd } from "./shared";
@@ -47,7 +48,8 @@ interface Row {
   emDashes: number;
 }
 
-function summarize(sites: BakeoffSite[], planners: string[]): Row[] {
+function summarize(sites: BakeoffSite[], planners: string[], style: TrailerStyle): Row[] {
+  const target = WORDS_TARGET[style];
   return planners.map((planner) => {
     const runs = sites.flatMap((s) => s.runs.filter((r) => r.planner === planner));
     const usable = runs.filter((r) => r.usable);
@@ -59,7 +61,7 @@ function summarize(sites: BakeoffSite[], planners: string[]): Row[] {
       kept: runs.reduce((a, r) => a + r.keptShots, 0),
       raw: runs.reduce((a, r) => a + r.rawShots, 0),
       avgWords: mean(usable.map((r) => r.words)),
-      inRange: usable.filter((r) => r.words >= WORDS_TARGET.min && r.words <= WORDS_TARGET.max).length,
+      inRange: usable.filter((r) => r.words >= target.min && r.words <= target.max).length,
       avgCost: mean(runs.map((r) => r.costUsd)),
       totalCost: runs.reduce((a, r) => a + r.costUsd, 0),
       avgLatency: mean(runs.map((r) => r.latencyMs)),
@@ -77,14 +79,14 @@ const cell = (text: string) => text.replace(/\|/g, "\\|").replace(/\n/g, " ");
 
 export async function writeReport(
   sites: BakeoffSite[],
-  meta: { models: ModelId[]; effort: Effort; spentUsd: number; dir: string },
+  meta: { models: ModelId[]; effort: Effort; style: TrailerStyle; spentUsd: number; dir: string },
 ): Promise<{ file: string; summary: string }> {
   await mkdir(meta.dir, { recursive: true });
   const planners = ["fallback", ...meta.models.map(aliasOf)];
-  const rows = summarize(sites, planners);
+  const rows = summarize(sites, planners, meta.style);
 
   const summaryTable = table(
-    ["Planner", "Usable plans", "Shots kept", "Avg words", `Words in ${WORDS_TARGET.min}-${WORDS_TARGET.max}`, "Avg cost", "Total cost", "Avg time", "Hype words", "Em dashes"],
+    ["Planner", "Usable plans", "Shots kept", "Avg words", `Words in ${WORDS_TARGET[meta.style].min}-${WORDS_TARGET[meta.style].max} (${meta.style})`, "Avg cost", "Total cost", "Avg time", "Hype words", "Em dashes"],
     rows.map((r) => [
       r.planner,
       `${r.usable}/${r.apps}`,

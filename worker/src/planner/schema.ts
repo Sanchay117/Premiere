@@ -18,24 +18,34 @@ export const ShotSchema = z.object({
     .string()
     .nullable()
     .describe("For type only: a short, harmless example to type, at most 60 characters. Null for every other action."),
-  narration: z.string().describe("Line spoken during this shot, 8 to 15 words, about what is on screen."),
+  narration: z.string().describe("Line spoken during this shot, about what is on screen. Length follows the style rules."),
+  punch: z
+    .string()
+    .default("")
+    .describe("On-screen title for this shot, 1 to 4 words, specific to what it shows, for example: Paste any link."),
 });
 
 export const PlanSchema = z.object({
   appName: z.string().describe("The app's name as the site presents it."),
   tagline: z.string().describe("Title card subtitle, at most 8 words."),
   mood: z.enum(["energetic", "calm", "playful", "bold"]).describe("Music mood that suits the app."),
-  hook: z.string().describe("Opening line spoken over the title card, 6 to 12 words."),
+  hook: z.string().describe("Opening line spoken over the title card. Length follows the style rules."),
   shots: z.array(ShotSchema).describe("5 to 7 shots in story order."),
-  close: z.string().describe("Closing line spoken over the end card, inviting the viewer to try the app, 6 to 12 words."),
+  close: z.string().describe("Closing line spoken over the end card, inviting the viewer to try the app. Length follows the style rules."),
   cta: z.string().describe("End card button text, at most 5 words, for example: Try it free."),
 });
 
 export type Shot = z.infer<typeof ShotSchema>;
 export type Plan = z.infer<typeof PlanSchema>;
+/** A plan before validation: punch titles may be missing (saved and fallback plans). */
+export type PlanInput = z.input<typeof PlanSchema>;
 
-/** Narration target for a 45 second trailer, across hook, shot lines and close. */
-export const WORDS_TARGET = { min: 95, max: 125 } as const;
+/** Narration target for a 45 second trailer, across hook, shot lines and close. A hype cut
+ *  spends about 5 seconds on punch titles, so it says less. */
+export const WORDS_TARGET = {
+  walkthrough: { min: 95, max: 125 },
+  hype: { min: 75, max: 110 },
+} as const;
 
 export function planWords(plan: Plan): number {
   return countWords([plan.hook, ...plan.shots.map((s) => s.narration), plan.close].join(" "));

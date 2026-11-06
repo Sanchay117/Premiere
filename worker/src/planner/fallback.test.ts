@@ -20,7 +20,7 @@ test("fallback plan is valid and close to the word target", () => {
   assert.equal(v.usable, true, v.issues.join("; "));
   assert.equal(v.droppedShots, 0);
   assert.ok(plan.shots.length >= 4);
-  assert.ok(planWords(plan) >= 70 && planWords(plan) <= WORDS_TARGET.max, `words: ${planWords(plan)}`);
+  assert.ok(planWords(plan) >= 70 && planWords(plan) <= WORDS_TARGET.walkthrough.max, `words: ${planWords(plan)}`);
   assert.equal(plan.close, "Try Tidy today at example-app.test.");
 });
 

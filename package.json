@@ -1,0 +1,20 @@
+{
+  "name": "premiere",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paste a URL, get a launch trailer.",
+  "workspaces": [
+    "worker"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "capture": "npm run -w worker capture --",
+    "plan": "npm run -w worker plan --",
+    "bakeoff": "npm run -w worker bakeoff --",
+    "spend": "npm run -w worker spend",
+    "test": "npm run -w worker test",
+    "typecheck": "npm run -w worker typecheck"
+  }
+}

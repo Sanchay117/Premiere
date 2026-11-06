@@ -1,0 +1,26 @@
+{
+  "name": "@premiere/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Premiere worker: capture, plan, record, voice and render one trailer job.",
+  "scripts": {
+    "capture": "tsx src/cli/capture.ts",
+    "plan": "tsx src/cli/plan.ts",
+    "bakeoff": "tsx src/cli/bakeoff.ts",
+    "spend": "tsx src/cli/spend.ts",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "playwright": "^1.65.0",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

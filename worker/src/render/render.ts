@@ -157,6 +157,9 @@ export function renderTrailer(
       // than the default preset in our benchmark, with a slightly smaller file at the same CRF.
       x264Preset: "veryfast",
       pixelFormat: "yuv420p",
+      // Standard video range and BT.709, which every player reads the same way. Remotion 4's
+      // default tagged trailers as full range BT.601, which some players show washed out.
+      colorSpace: "bt709",
       audioCodec: "aac",
       audioBitrate: "192k",
       outputLocation: video,

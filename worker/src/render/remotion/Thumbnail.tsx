@@ -6,17 +6,13 @@
 
 import type React from "react";
 import { AbsoluteFill, Img } from "remotion";
+import { fitTitle } from "./fit";
 import { COLORS, gothic, mono, sans, serif } from "./fonts";
 import { BAR, WindowBar } from "./Trailer";
 import type { ThumbnailProps } from "./types";
 
 const W = 1920;
 const H = 1080;
-
-/** Display size that fits a name into a column. perChar is the face's average width in em. */
-function fit(name: string, max: number, min: number, width: number, perChar: number): number {
-  return Math.round(Math.max(min, Math.min(max, width / Math.max(1, name.length * perChar))));
-}
 
 /** At most `lines` lines; anything longer ends in an ellipsis instead of crowding the poster. */
 const clamp = (lines: number): React.CSSProperties => ({
@@ -89,11 +85,10 @@ function HypePoster({ src, app, accent }: { src: string; app: ThumbnailProps["ap
           <div
             style={{
               fontFamily: gothic,
-              fontSize: fit(name, 260, 110, 540, 0.36),
+              fontSize: fitTitle(name, "gothic", 540, 260),
               lineHeight: 0.88,
               color: COLORS.cream,
               textShadow: "0 12px 50px rgba(0,0,0,0.55)",
-              overflowWrap: "anywhere",
             }}
           >
             {name}
@@ -129,7 +124,7 @@ function WalkthroughPoster({ src, app, accent }: { src: string; app: ThumbnailPr
       <AbsoluteFill style={{ background: "linear-gradient(90deg, rgba(7,8,12,0.5) 0%, rgba(7,8,12,0) 58%)" }} />
       <AbsoluteFill style={{ justifyContent: "flex-end", padding: "0 110px 98px" }}>
         <div style={{ width: 84, height: 7, background: accent, marginBottom: 28 }} />
-        <div style={{ fontFamily: serif, fontSize: fit(app.name, 170, 104, 1300, 0.46), lineHeight: 0.95, color: COLORS.cream, maxWidth: 1300, ...clamp(2) }}>
+        <div style={{ fontFamily: serif, fontSize: fitTitle(app.name, "serif", 1300, 170), lineHeight: 0.95, color: COLORS.cream, maxWidth: 1300, ...clamp(2) }}>
           {app.name}
         </div>
         {app.tagline && (

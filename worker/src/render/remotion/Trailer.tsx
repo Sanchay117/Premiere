@@ -7,6 +7,7 @@
 import type React from "react";
 import { AbsoluteFill, Audio, Easing, Img, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CaptionStyle } from "../../options";
+import { fitTitle } from "./fit";
 import { COLORS, gothic, mono, sans, serif } from "./fonts";
 import type { AppInfo, CaptionWord, TrailerProps, TrailerSegment } from "./types";
 
@@ -30,10 +31,6 @@ function pickFrame(frames: TrailerProps["frames"], t: number): string {
   return frames[best]?.file ?? "";
 }
 
-/** Display size that keeps long app names on one line. perChar is the face's average width in em. */
-function titleSize(name: string, max: number, width: number, perChar = 0.46): number {
-  return Math.round(Math.max(max * 0.45, Math.min(max, width / Math.max(1, name.length * perChar))));
-}
 
 const STARS = (() => {
   let s = 1913;
@@ -85,8 +82,10 @@ function TitleCard({ app }: { app: AppInfo }) {
         <div
           style={{
             fontFamily: serif,
-            fontSize: titleSize(app.name, 200, 1700),
+            // One line always: the letter spacing animates, and a wrap would come and go with it.
+            fontSize: fitTitle(app.name, "serif", 1700, 200, false),
             lineHeight: 1,
+            whiteSpace: "nowrap",
             color: COLORS.cream,
             letterSpacing: `${spacing}em`,
             marginTop: 28,
@@ -323,7 +322,7 @@ function HypeTitle({ app }: { app: AppInfo }) {
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
       <div style={{ textAlign: "center", marginTop: -40, transform: `scale(${settle})` }}>
-        <div style={{ fontFamily: gothic, fontSize: titleSize(name, 330, 1680, 0.36), lineHeight: 0.9, color: COLORS.cream, transform: `scale(${slam})`, opacity: shown }}>
+        <div style={{ fontFamily: gothic, fontSize: fitTitle(name, "gothic", 1680, 330), lineHeight: 0.9, maxWidth: 1680, color: COLORS.cream, transform: `scale(${slam})`, opacity: shown }}>
           {name}
         </div>
         {app.tagline && (
@@ -480,7 +479,7 @@ function HypeEnd({ app }: { app: AppInfo }) {
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: -100 }}>
-        <div style={{ fontFamily: gothic, fontSize: titleSize(name, 210, 1500, 0.36), lineHeight: 0.9, color: COLORS.cream, opacity: rise(0), transform: `translateY(${(1 - rise(0)) * 30}px)` }}>
+        <div style={{ fontFamily: gothic, fontSize: fitTitle(name, "gothic", 1500, 210), lineHeight: 0.9, maxWidth: 1500, textAlign: "center", color: COLORS.cream, opacity: rise(0), transform: `translateY(${(1 - rise(0)) * 30}px)` }}>
           {name}
         </div>
         <div

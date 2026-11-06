@@ -2,11 +2,11 @@
 
 // The choices on the box office ticket, drawn like a printed order form: tick boxes for the cut,
 // a car radio for the narrator (drive-ins played the soundtrack over FM), little frames for the
-// caption looks, and a typed select for who writes the script.
+// caption looks.
 
 import { useEffect, useRef, useState } from "react";
 import { CAPTIONS, NARRATORS, STYLES } from "@/lib/options";
-import { PLANNERS, type CaptionStyle, type PlannerChoice, type TrailerStyle, type VoiceChoice } from "@/lib/types";
+import type { CaptionStyle, TrailerStyle, VoiceChoice } from "@/lib/types";
 
 export function FormLabel({ children }: { children: React.ReactNode }) {
   return <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-paper-dim">{children}</span>;
@@ -191,25 +191,5 @@ export function CaptionPicker({ value, onChange }: { value: CaptionStyle; onChan
         })}
       </div>
     </fieldset>
-  );
-}
-
-export function ModelSelect({ value, onChange }: { value: PlannerChoice; onChange: (v: PlannerChoice) => void }) {
-  return (
-    <label className="flex items-center gap-2">
-      <FormLabel>Script by</FormLabel>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as PlannerChoice)}
-        className="cursor-pointer border-b-2 border-paper-ink/40 bg-transparent py-0.5 pr-1 font-mono text-[13px] font-bold text-paper-ink outline-none focus-visible:border-ticket"
-      >
-        {PLANNERS.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.family}
-            {p.tag ? ` (${p.tag.toLowerCase()})` : ""}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

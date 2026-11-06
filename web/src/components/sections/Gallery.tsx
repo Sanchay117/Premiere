@@ -47,8 +47,7 @@ export function EmptyLobby() {
         <p className="mt-2.5 px-1 font-mono text-[12px] font-bold uppercase tracking-[0.1em] text-paper-dim">Coming soon</p>
       </div>
       <p className="max-w-md text-lg leading-relaxed text-cream-dim">
-        The lobby is bare tonight. Make a trailer, keep &ldquo;Show it in the gallery&rdquo; ticked, and once we have had a look it could
-        hang right here.
+        The lobby is bare tonight. Make a trailer, keep &ldquo;Show it in the gallery&rdquo; ticked, and it will hang right here.
       </p>
     </div>
   );

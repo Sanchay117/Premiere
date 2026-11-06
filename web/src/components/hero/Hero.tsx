@@ -36,7 +36,7 @@ export function Hero() {
           <div className="rise relative z-10" style={{ ["--delay" as string]: "0.15s" }}>
             <p className="max-w-xl text-[1.12rem] leading-relaxed text-cream-dim">
               Leave your link at the box office. An agent drives in, clicks through your app, writes the script and films real
-              footage. About five minutes later your trailer is up on the big screen, narrated, captioned and scored.
+              footage. A couple of minutes later your trailer is up on the big screen, narrated, captioned and scored.
             </p>
             <UrlForm url={url} onUrlChange={setUrl} />
           </div>

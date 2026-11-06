@@ -43,7 +43,7 @@ export function Nav() {
             </a>
           ))}
         </nav>
-        <span className="hidden font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-amber sm:block">Vibeathon 02 · Night shift</span>
+        <span className="hidden font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-amber sm:block">Open all night</span>
       </div>
     </header>
   );
@@ -57,7 +57,7 @@ export function Footer() {
           <Wordmark className="text-2xl" />
           <span className="text-sm text-cream-faint">Launch trailers, made by an agent.</span>
         </Link>
-        <p className="font-mono text-xs text-cream-faint">Made for Vibestarter Vibeathon 02: Night shift</p>
+        <p className="font-mono text-xs text-cream-faint">Open all night. No account, no subscription.</p>
       </div>
     </footer>
   );

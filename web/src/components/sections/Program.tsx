@@ -1,7 +1,8 @@
 "use client";
 
 // Tonight's program: the five reels of a trailer job, printed on a handbill like a drive-in's
-// weekly program, scheduled from 2:00 to 2:05 a.m. A clock beside it ticks forward as you scroll.
+// weekly program and timed to the second like a running order, from 2:00 to about 2:02 a.m.
+// (a real job on the dev laptop). A clock beside it sweeps forward as you scroll.
 
 import { motion, useMotionValueEvent, useScroll, useSpring, useTransform } from "motion/react";
 import { useRef, useState } from "react";
@@ -9,40 +10,44 @@ import { Reveal } from "./Reveal";
 
 const REELS = [
   {
-    time: "2:00",
+    time: "2:00:00",
     title: "The capture",
     body: "A fresh, locked-down browser opens your app at 1920 by 1080, clears the cookie banners and maps every button, link and section. It stays on public pages and never signs in.",
     credit: "Playwright",
   },
   {
-    time: "2:01",
+    time: "2:00:15",
     title: "The script",
     body: "One Claude call reads the screenshots and writes the shot list in the cut you chose: what to click, what to type, where to scroll, a punch title for every shot, and narration that only says what your page supports.",
-    credit: "Claude Sonnet 5.5",
+    credit: "Claude Opus 5.5",
   },
   {
-    time: "2:02",
+    time: "2:00:22",
     title: "The voice",
-    body: "Your narrator reads the script: one of eight voices, or the one that suits your app. Every word gets a timestamp, so the captions land exactly when they are spoken.",
+    body: "Your narrator reads the script: one of eight voices, or the one that suits your app. Every word gets a timestamp, so the captions land exactly when they are spoken. Meanwhile the browser is already opening your app for the shoot.",
     credit: "Deepgram Aura-2",
   },
   {
-    time: "2:03",
+    time: "2:00:31",
     title: "The shoot",
     body: "The browser replays the shot list and films it, each shot exactly as long as its line. Every step has a timeout, and a step that fails is skipped, never faked.",
     credit: "Real footage",
   },
   {
-    time: "2:05",
+    time: "2:01:16",
     title: "The cut",
     body: "Punch titles or a calm tour, a camera that eases toward each click, captions in your style, a score made from code, an end card with your URL, two thumbnails and mastered sound.",
     credit: "Remotion",
   },
 ];
 
-function Clock({ minutes }: { minutes: ReturnType<typeof useSpring> }) {
-  const minuteAngle = useTransform(minutes, (m) => m * 6);
-  const hourAngle = useTransform(minutes, (m) => 60 + m * 0.5);
+/** Seconds after 2:00 a.m. when the trailer is done: the running order's last reel plus its length. */
+const DONE_AT = 131;
+
+function Clock({ seconds }: { seconds: ReturnType<typeof useSpring> }) {
+  const secondAngle = useTransform(seconds, (s) => s * 6);
+  const minuteAngle = useTransform(seconds, (s) => s * 0.1);
+  const hourAngle = useTransform(seconds, (s) => 60 + s / 120);
   return (
     <div className="relative size-44 rounded-full border-2 border-cream/30 bg-[radial-gradient(circle,#15120d,#0b0a08)] md:size-52">
       {Array.from({ length: 12 }, (_, i) => (
@@ -57,7 +62,8 @@ function Clock({ minutes }: { minutes: ReturnType<typeof useSpring> }) {
       ))}
       <span className="absolute inset-x-0 top-[25%] text-center font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-cream-faint">a.m.</span>
       <motion.span className="absolute bottom-1/2 left-1/2 h-[26%] w-[3px] origin-bottom -translate-x-1/2 bg-cream" style={{ rotate: hourAngle }} />
-      <motion.span className="absolute bottom-1/2 left-1/2 h-[38%] w-[2px] origin-bottom -translate-x-1/2 bg-ticket" style={{ rotate: minuteAngle }} />
+      <motion.span className="absolute bottom-1/2 left-1/2 h-[38%] w-[3px] origin-bottom -translate-x-1/2 bg-cream" style={{ rotate: minuteAngle }} />
+      <motion.span className="absolute bottom-1/2 left-1/2 h-[42%] w-px origin-bottom -translate-x-1/2 bg-ticket" style={{ rotate: secondAngle }} />
       <span className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ticket" />
     </div>
   );
@@ -66,10 +72,13 @@ function Clock({ minutes }: { minutes: ReturnType<typeof useSpring> }) {
 export function Program() {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start 60%", "end 70%"] });
-  const minutes = useSpring(useTransform(scrollYProgress, [0, 1], [0, 5]), { stiffness: 90, damping: 22 });
+  const seconds = useSpring(useTransform(scrollYProgress, [0, 1], [0, DONE_AT]), { stiffness: 90, damping: 22 });
   const [active, setActive] = useState(0);
   useMotionValueEvent(scrollYProgress, "change", (v) => setActive(Math.min(REELS.length - 1, Math.floor(v * REELS.length))));
-  const clockLabel = useTransform(minutes, (m) => `2:${String(Math.min(5, Math.floor(m))).padStart(2, "0")} A.M.`);
+  const clockLabel = useTransform(seconds, (value) => {
+    const s = Math.max(0, Math.min(DONE_AT, Math.floor(value)));
+    return `2:${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")} A.M.`;
+  });
 
   return (
     <section id="program" ref={ref} className="relative scroll-mt-24 py-24 md:py-32">
@@ -82,11 +91,11 @@ export function Program() {
               PROGRAM
             </h2>
             <p className="mt-5 max-w-sm text-lg leading-relaxed text-cream-dim">
-              You ship at 2 a.m. The trailer is ready by 2:05, five reels run back to back while you get back to building.
+              You ship at 2 a.m. Five reels run back to back while you get back to building, and the trailer is ready before 2:03.
             </p>
           </Reveal>
           <div className="mt-9 flex items-center gap-6">
-            <Clock minutes={minutes} />
+            <Clock seconds={seconds} />
             <motion.p className="font-mono text-2xl font-bold tabular-nums text-cream">{clockLabel}</motion.p>
           </div>
         </div>
@@ -103,7 +112,7 @@ export function Program() {
                 return (
                   <li key={reel.title} className="border-b border-dashed border-paper-ink/25 py-5 last:border-0">
                     <div className="flex items-baseline gap-3">
-                      <span className={`w-[4.6rem] shrink-0 font-mono text-[15px] font-bold tabular-nums transition-colors duration-500 ${on ? "text-ticket" : "text-paper-dim/60"}`}>
+                      <span className={`w-[6rem] shrink-0 font-mono text-[15px] font-bold tabular-nums transition-colors duration-500 ${on ? "text-ticket" : "text-paper-dim/60"}`}>
                         {reel.time} AM
                       </span>
                       <h3 className={`font-display text-[clamp(1.9rem,3.4vw,2.6rem)] leading-none tracking-[0.03em] transition-colors duration-500 ${on ? "text-paper-ink" : "text-paper-ink/35"}`}>
@@ -112,7 +121,7 @@ export function Program() {
                       <span className="mx-1 hidden flex-1 translate-y-[-0.3em] border-b-2 border-dotted border-paper-ink/30 sm:block" />
                       <span className="hidden shrink-0 font-mono text-[12px] font-bold uppercase tracking-[0.12em] text-paper-dim sm:block">Reel {i + 1}</span>
                     </div>
-                    <motion.div initial={false} animate={{ opacity: on ? 1 : 0.4 }} transition={{ duration: 0.5 }} className="pl-0 sm:pl-[5.35rem]">
+                    <motion.div initial={false} animate={{ opacity: on ? 1 : 0.4 }} transition={{ duration: 0.5 }} className="pl-0 sm:pl-[6.75rem]">
                       <p className="mt-2.5 max-w-xl leading-relaxed text-paper-ink/85">{reel.body}</p>
                       <p className="mt-2 font-mono text-[12px] font-bold uppercase tracking-[0.12em] text-paper-dim">With {reel.credit}</p>
                     </motion.div>

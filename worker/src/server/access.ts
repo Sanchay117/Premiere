@@ -92,10 +92,10 @@ export function admit(code: string | undefined, visitor: string): Promise<Access
     const state = await readState();
     const normalized = code?.trim().toUpperCase() ?? "";
     if (accessRequired) {
-      if (!normalized) return { ok: false, needsCode: true, reason: "Free trailers need an entrant code. Grab one in the Vibestarter Discord." };
+      if (!normalized) return { ok: false, needsCode: true, reason: "Free trailers need an access code right now. Grab one in the Vibestarter Discord." };
       const max = CODES.get(normalized);
-      if (max === undefined) return { ok: false, needsCode: true, reason: "That entrant code is not valid. Check it in the Vibestarter Discord." };
-      if ((state.codes[normalized] ?? 0) >= max) return { ok: false, reason: "That entrant code has been used up." };
+      if (max === undefined) return { ok: false, needsCode: true, reason: "That access code is not valid. Check it in the Vibestarter Discord." };
+      if ((state.codes[normalized] ?? 0) >= max) return { ok: false, reason: "That access code has been used up." };
     }
     if (state.total >= DAILY_CAP) return { ok: false, reason: "Tonight's free screenings are full. Come back tomorrow." };
     const key = await visitorKey(visitor);

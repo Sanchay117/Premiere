@@ -1,22 +1,21 @@
 "use client";
 
 // The box office ticket: the app's link, then the cut, the narrator and the captions, printed like
-// an order form on ticket stock. While Vibeathon 02 runs, trailers are free; once payments are
-// on, the same ticket takes USDC from the visitor's wallet over x402.
+// an order form on ticket stock. Until 16 Nov trailers are free; once payments are on, the same
+// ticket takes USDC from the visitor's wallet over x402. Claude Opus writes every script.
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { DEFAULT_OPTIONS, FREE_UNTIL_LABEL } from "@/lib/options";
-import type { CaptionStyle, PlannerChoice, Pricing, TrailerStyle, VoiceChoice } from "@/lib/types";
+import type { CaptionStyle, Pricing, TrailerStyle, VoiceChoice } from "@/lib/types";
 import { LetterboxClose } from "./Letterbox";
-import { CaptionPicker, FormLabel, ModelSelect, NarratorDial, StylePicker } from "./pickers";
+import { CaptionPicker, FormLabel, NarratorDial, StylePicker } from "./pickers";
 
 export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrlChange: (url: string) => void }) {
   const router = useRouter();
   const [style, setStyle] = useState<TrailerStyle>(DEFAULT_OPTIONS.style);
   const [voice, setVoice] = useState<VoiceChoice>(DEFAULT_OPTIONS.voice);
   const [captions, setCaptions] = useState<CaptionStyle>(DEFAULT_OPTIONS.captions);
-  const [planner, setPlanner] = useState<PlannerChoice>("sonnet");
   const [gallery, setGallery] = useState(true);
   const [code, setCode] = useState("");
   const [needsCode, setNeedsCode] = useState(false);
@@ -43,7 +42,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
       return;
     }
     setState("sending");
-    const order = { url, planner, style, voice, captions, gallery, code: code.trim() || undefined };
+    const order = { url, style, voice, captions, gallery, code: code.trim() || undefined };
     let id: string | undefined;
     try {
       if (paid && pricing) {
@@ -118,7 +117,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
           {needsCode && (
             <div className="mt-3 flex items-center gap-3">
               <label htmlFor="code">
-                <FormLabel>Entrant code</FormLabel>
+                <FormLabel>Access code</FormLabel>
               </label>
               <input
                 id="code"
@@ -136,19 +135,18 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
         <NarratorDial value={voice} onChange={setVoice} />
         <CaptionPicker value={captions} onChange={setCaptions} />
 
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t-2 border-dashed border-paper-ink/25 pt-4">
+        <div className="border-t-2 border-dashed border-paper-ink/25 pt-4">
           <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-paper-ink">
             <input type="checkbox" checked={gallery} onChange={(e) => setGallery(e.target.checked)} className="size-4 accent-[#c8372d]" />
-            Show it in the gallery <span className="text-paper-dim">(we look first)</span>
+            Show it in the gallery
           </label>
-          <ModelSelect value={planner} onChange={setPlanner} />
         </div>
       </div>
 
       <div className="border-t-2 border-dashed border-paper-ink/25 px-5 py-3 font-mono text-[12px] font-bold text-paper-dim sm:px-6">
         {paid && pricing
-          ? `$${pricing.priceUsd} in USDC on ${pricing.networkName}, paid from your wallet. About five minutes a trailer.`
-          : `Free until Vibeathon 02 ends (${FREE_UNTIL_LABEL}). About five minutes a trailer.`}
+          ? `$${pricing.priceUsd} in USDC on ${pricing.networkName}, paid from your wallet. Two or three minutes a trailer.`
+          : `Free until ${FREE_UNTIL_LABEL}, then a few USDC. Two or three minutes a trailer.`}
       </div>
       <LetterboxClose active={state === "closing"} />
     </form>

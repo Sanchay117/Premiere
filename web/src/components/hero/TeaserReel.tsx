@@ -150,7 +150,7 @@ function ScriptScene() {
         <span className="font-mono text-[clamp(8px,0.95vw,11px)] uppercase tracking-[0.2em] text-cream-faint">Nightjar · trailer script</span>
         <span className="flex items-center gap-1.5 rounded-full border border-amber/40 bg-amber/10 px-2 py-0.5 font-mono text-[clamp(8px,0.9vw,11px)] text-amber">
           <span className="rec-dot size-1.5 rounded-full bg-amber" />
-          Claude Sonnet 5.5 writing
+          Claude Opus 5.5 writing
         </span>
       </div>
       <div className="mt-[4%] space-y-[2.2%]">

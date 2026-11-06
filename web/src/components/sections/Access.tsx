@@ -24,7 +24,7 @@ export function Access() {
         <Reveal>
           <h2 className="font-display text-[clamp(3.2rem,7vw,6.2rem)] leading-[0.92] tracking-[0.01em]">BOX OFFICE</h2>
           <p className="mt-4 max-w-xl text-lg leading-relaxed text-cream-dim">
-            No account, no subscription. Free while Vibeathon 02 runs, then a few USDC a trailer.
+            No account, no subscription. Free until {FREE_UNTIL_LABEL}, then a few USDC a trailer.
           </p>
         </Reveal>
 
@@ -33,7 +33,7 @@ export function Access() {
             <div className="rounded-[6px] border-[12px] border-[#2b1d10] bg-[#2b1d10] shadow-[0_40px_80px_-40px_rgb(0_0_0/0.95),inset_0_0_0_2px_#3d2a16]">
               <div className="letterboard px-6 py-7 font-display text-[clamp(1.55rem,3vw,2.35rem)] uppercase leading-[1.18] tracking-[0.07em] text-white/90 sm:px-9">
                 <p className="mb-3 text-center text-[1.15em] tracking-[0.18em] text-[#ffe2a8]">ADMISSION</p>
-                <BoardRow left="EVERYONE" right="FREE" note={`UNTIL VIBEATHON 02 ENDS, ${FREE_UNTIL_LABEL.toUpperCase()}`} />
+                <BoardRow left="EVERYONE" right="FREE" note={`UNTIL ${FREE_UNTIL_LABEL.toUpperCase()}`} />
                 <BoardRow left="AFTER THAT" right="A FEW USDC" note="PER TRAILER, PAID ON BASE" />
                 <BoardRow left="AI AGENTS" right="ONE X402 CALL" note="SAME PRICE, NO SIGN UP" />
                 <p className="mt-4 text-center text-[0.55em] tracking-[0.16em] text-white/55">FAIR USE: A FEW FREE TRAILERS A DAY PER VISITOR</p>
@@ -45,7 +45,7 @@ export function Access() {
             <div id="agents" className="paper scroll-mt-28 px-6 py-6 shadow-[0_40px_80px_-40px_rgb(0_0_0/0.9)] sm:px-8">
               <p className="font-display text-[2.1rem] leading-none tracking-[0.05em]">FOR AI AGENTS</p>
               <p className="mt-3 text-[15px] leading-relaxed text-paper-ink/85">
-                One HTTP request orders a trailer. It is free during the Vibeathon; after that, the first answer is a 402 with x402
+                One HTTP request orders a trailer. It is free until {FREE_UNTIL_LABEL}; after that, the first answer is a 402 with x402
                 payment requirements. Sign the USDC authorization and send the same request again with a PAYMENT-SIGNATURE header.
               </p>
               <pre className="mt-4 overflow-x-auto border-2 border-paper-ink/80 bg-[#fbf6ea] p-4 font-mono text-[13px] leading-relaxed text-paper-ink">

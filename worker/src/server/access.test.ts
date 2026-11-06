@@ -17,7 +17,7 @@ test("entrant codes, per-visitor limits and code caps", async (t) => {
   t.after(() => rm(dir, { recursive: true, force: true }));
   assert.equal(accessRequired, true);
 
-  assert.match((await admit(undefined, "visitor-a")).reason ?? "", /entrant code/);
+  assert.match((await admit(undefined, "visitor-a")).reason ?? "", /access code/);
   assert.match((await admit("WRONG", "visitor-a")).reason ?? "", /not valid/);
   assert.deepEqual(await admit(" night ", "visitor-a"), { ok: true, code: "NIGHT" });
   assert.match((await admit("NIGHT", "visitor-a")).reason ?? "", /today's 1 free/);

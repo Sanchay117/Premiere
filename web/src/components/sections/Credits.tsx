@@ -9,7 +9,7 @@ import { Wordmark } from "@/components/chrome";
 
 const CREDITS: [string, string][] = [
   ["Directed by", "An agent"],
-  ["Screenplay", "Claude Sonnet 5.5"],
+  ["Screenplay", "Claude Opus 5.5"],
   ["Cinematography", "Chromium, via Playwright"],
   ["Narration", "Deepgram Aura-2, eight voices"],
   ["Edited in", "Remotion"],
@@ -18,7 +18,6 @@ const CREDITS: [string, string][] = [
   ["Security", "One very suspicious proxy"],
   ["Catering", "Instant noodles, 3 a.m."],
   ["Filmed on location", "Your app"],
-  ["Made for", "Vibestarter Vibeathon 02: Night shift"],
 ];
 
 const WINDOW = 460;
@@ -53,7 +52,7 @@ export function Credits() {
         <span className="flex items-baseline gap-2">
           <Wordmark className="text-xl" /> Launch trailers, made by an agent
         </span>
-        <span className="font-mono">Made for Vibestarter Vibeathon 02: Night shift</span>
+        <span className="font-mono">Open all night</span>
       </div>
     </footer>
   );

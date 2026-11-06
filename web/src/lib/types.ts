@@ -126,13 +126,14 @@ export interface Pricing {
   asset: string | null;
 }
 
-export const PLANNERS: { id: PlannerChoice; name: string; family: string; blurb: string; cost: string; tag?: string }[] = [
-  { id: "sonnet", name: "Sonnet", family: "Claude Sonnet 5.5", blurb: "Vivid, grounded scripts", cost: "~$0.015", tag: "Our pick" },
-  { id: "opus", name: "Opus", family: "Claude Opus 5.5", blurb: "Tightest edit", cost: "~$0.03" },
-  { id: "haiku", name: "Haiku", family: "Claude Haiku 5.5", blurb: "Quickest draft", cost: "~$0.001" },
-  { id: "none", name: "No AI", family: "Free planner", blurb: "Script from the page's own words", cost: "$0" },
-];
+/** Claude Opus writes every script now; the other names remain for trailers made before. */
+const PLANNER_NAMES: Record<PlannerChoice, string> = {
+  opus: "Claude Opus 5.5",
+  sonnet: "Claude Sonnet 5.5",
+  haiku: "Claude Haiku 5.5",
+  none: "Free planner",
+};
 
 export function plannerName(id: PlannerChoice): string {
-  return PLANNERS.find((p) => p.id === id)?.family ?? id;
+  return PLANNER_NAMES[id] ?? id;
 }

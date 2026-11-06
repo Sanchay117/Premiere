@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { PLANNERS, plannerName, type JobView, type PlannerChoice, type Shot } from "@/lib/types";
+import { plannerName, type JobView, type Shot } from "@/lib/types";
 import { Animatic, buildScenes, runtimeOf, type AnimaticHandle } from "./Animatic";
 
 const ACTION_STYLE: Record<Shot["action"], string> = {
@@ -26,20 +26,26 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
 }
 
+/** A second take of the same app: filmed again with a fresh script, or in the other cut. */
 function Rerun({ job }: { job: JobView }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<PlannerChoice | null>(null);
+  const [busy, setBusy] = useState<"again" | "other" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const others = PLANNERS.filter((p) => p.id !== job.planner);
+  const style = job.options?.style ?? "hype";
+  const other = style === "hype" ? "walkthrough" : "hype";
+  const takes = [
+    { id: "again" as const, label: "Same cut, new script", order: { fresh: true } },
+    { id: "other" as const, label: `The ${other} cut`, order: { style: other } },
+  ];
 
-  const run = async (planner: PlannerChoice) => {
-    setBusy(planner);
+  const run = async (take: (typeof takes)[number]) => {
+    setBusy(take.id);
     setError(null);
     try {
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: job.url, planner, ...job.options }),
+        body: JSON.stringify({ url: job.url, ...job.options, gallery: job.gallery ?? true, ...take.order }),
       });
       const data = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
       if (!response.ok || !data.id) throw new Error(data.error ?? "Could not start the job.");
@@ -53,18 +59,21 @@ function Rerun({ job }: { job: JobView }) {
   return (
     <div className="mt-16 rounded-2xl border border-line bg-ink-2/60 p-6 md:p-8">
       <p className="eyebrow">Second take</p>
-      <h3 className="mt-3 font-display text-[2.4rem] leading-none tracking-[0.03em]">HEAR ANOTHER WRITER ON THE SAME APP</h3>
-      <p className="mt-2 text-sm text-cream-dim">Uses the same capture, so only the script changes. Each plan is cached per model.</p>
+      <h3 className="mt-3 font-display text-[2.4rem] leading-none tracking-[0.03em]">SHOOT ANOTHER TAKE</h3>
+      <p className="mt-2 text-sm text-cream-dim">
+        A new take films your app again and Claude writes a fresh script, so it can come out quite different. It counts as one of
+        today&apos;s free trailers.
+      </p>
       <div className="mt-6 flex flex-wrap gap-3">
-        {others.map((p) => (
+        {takes.map((take) => (
           <button
-            key={p.id}
+            key={take.id}
             type="button"
             disabled={busy !== null}
-            onClick={() => run(p.id)}
+            onClick={() => run(take)}
             className="rounded-full border border-line-strong px-4 py-2 text-sm transition hover:border-amber hover:text-amber disabled:opacity-50"
           >
-            {busy === p.id ? "Starting" : p.family} <span className="font-mono text-xs text-cream-faint">{p.cost}</span>
+            {busy === take.id ? "Starting" : take.label}
           </button>
         ))}
         <a href="/#make" className="rounded-full px-4 py-2 text-sm text-cream-dim underline-offset-4 hover:text-cream hover:underline">
@@ -111,7 +120,7 @@ export function Storyboard({ job }: { job: JobView }) {
         <aside className="h-fit rounded-2xl border border-line bg-ink-2/70 p-6">
           <p className="eyebrow mb-2">The take</p>
           <Stat label="Script by" value={writer} hint={planner.source === "cache" ? "from cache, $0" : undefined} />
-          <Stat label="Narration" value={`${planner.words} words`} hint={job.options?.style === "hype" ? "target 75 to 110" : "target 95 to 125"} />
+          <Stat label="Narration" value={`${planner.words} words`} hint={job.options?.style === "hype" ? "target 55 to 85" : "target 95 to 125"} />
           <Stat label="Runtime" value={`about ${Math.round(runtime)} s`} />
           <Stat label="Shots" value={String(plan.shots.length)} />
           <Stat label="Mood" value={plan.mood} />

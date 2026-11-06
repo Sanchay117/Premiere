@@ -133,7 +133,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       if (!decision.ok) return send(res, 403, { error: decision.reason });
       const job = createJob(order.url.href, false, order.options, order.gallery);
       console.log(`job ${job.id.slice(0, 8)} ordered over x402 (free)`);
-      return send(res, 202, { ...jobLinks(job.id), free: true, note: "Trailers are free until Vibestarter Vibeathon 02 ends." });
+      return send(res, 202, { ...jobLinks(job.id), free: true, note: "Trailers are free until 16 Nov 2026." });
     }
     const signature = req.headers["payment-signature"];
     const paid = await charge(typeof signature === "string" ? signature : undefined);

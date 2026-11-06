@@ -1,7 +1,7 @@
 // Order a trailer with one HTTP request, the way AI agents (and the website, once payments are on)
 // do it. x402 v2: an unpaid request gets 402 with a PAYMENT-REQUIRED header; the client signs a
-// USDC authorization and repeats the request with PAYMENT-SIGNATURE. While Vibeathon 02 runs,
-// trailers are free and the first request is accepted.
+// USDC authorization and repeats the request with PAYMENT-SIGNATURE. Until 16 Nov trailers are
+// free and the first request is accepted.
 //   POST /api/x402/trailers  { url, style?: "hype" | "walkthrough", voice?, captions? }
 //   -> 202 { id, status, page }, then poll GET /api/jobs/:id until result.trailer is set.
 

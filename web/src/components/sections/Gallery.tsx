@@ -65,7 +65,7 @@ export function Gallery({ entries }: { entries: GalleryEntry[] }) {
               <br />
               THE BIG SCREEN
             </h2>
-            <p className="mt-4 max-w-xl text-lg leading-relaxed text-cream-dim">Trailers Premiere made for other apps, shown with their makers&apos; permission.</p>
+            <p className="mt-4 max-w-xl text-lg leading-relaxed text-cream-dim">Trailers Premiere made for other apps, hung here by the people who ordered them.</p>
           </div>
           {entries.length > shown.length && (
             <Link href="/gallery" className="font-mono text-[13px] font-bold uppercase tracking-[0.14em] text-amber hover:underline">

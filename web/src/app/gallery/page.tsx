@@ -8,7 +8,7 @@ import { workerJson } from "@/lib/worker";
 
 export const metadata: Metadata = {
   title: "Gallery: trailers made by Premiere",
-  description: "Launch trailers Premiere made for other apps, shown with their makers' permission.",
+  description: "Launch trailers Premiere made for other apps, hung here by the people who ordered them.",
 };
 
 export default async function GalleryPage() {
@@ -25,7 +25,7 @@ export default async function GalleryPage() {
           </Link>
           <h1 className="mt-6 font-display text-[clamp(3.4rem,8vw,7rem)] leading-[0.9] tracking-[0.01em]">THE LOBBY</h1>
           <p className="mt-4 max-w-xl text-lg leading-relaxed text-cream-dim">
-            Every trailer here was made by Premiere from nothing but a link, and is shown with its maker&apos;s permission.
+            Every trailer here was made by Premiere from nothing but a link, and hung here by whoever ordered it.
           </p>
           <div className="mt-14">
             {entries.length === 0 ? (

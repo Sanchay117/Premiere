@@ -66,7 +66,7 @@ Every claim in that text has to be true at submission: real footage, 45 seconds,
 - **After the Vibeathon:** a few USDC per trailer (`PRICE_USDC`, default 3) on Base, paid from the visitor's wallet over x402. Turn on with `PAYMENTS=mainnet` (or `testnet` for Base Sepolia) and check with `npm run payments`. Receiving address: `PAYMENT_ADDRESS` in `.env`.
 - **AI agents:** one x402 request, `POST /api/x402/trailers`, returns a job id (free during the Vibeathon). Default x402 clients refuse payments over $1 unless the agent raises its cap, so consider pricing agent orders at $1 or saying so in the docs.
 
-**Landing page:** a pre-made sample trailer plays above the fold, so a judge sees the output within 2 seconds (still the made-up Nightjar teaser; swap in Premiere's own trailer once deployed). Below it, the gallery of trailers made for other apps, with their makers' permission.
+**Landing page:** a pre-made sample trailer plays above the fold, so a judge sees the output within 2 seconds (still the made-up Nightjar teaser; swap in Premiere's own trailer once deployed). Below it, the gallery of trailers made for other apps, hung by whoever ordered them (the site no longer claims the app's maker agreed, since anyone can order a trailer of any public app; `npm run gallery -- remove <id>` handles takedown requests).
 
 ## Architecture
 

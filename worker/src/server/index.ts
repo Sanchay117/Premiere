@@ -1,6 +1,6 @@
 // npm run serve (in worker/) or npm run dev (repo root, with the web app).
 // Small HTTP API the web app calls server-side:
-//   POST /jobs                    { url, planner?, style?, voice?, captions?, gallery?, code?, fresh? } -> 202 { id }
+//   POST /jobs                    { url, style?, voice?, captions?, gallery?, code?, fresh? } -> 202 { id }
 //   GET  /jobs/:id                -> JobView (live, or read back from the job's job.json)
 //   GET  /jobs/:id/files/:name    -> a screenshot, or the trailer, thumbnails and captions once rendered
 //   GET  /gallery                 -> approved trailers whose makers opted in, newest first
@@ -24,12 +24,10 @@ import { accessRequired, admit } from "./access";
 import { warmRenderer } from "../render/render";
 import { galleryEntries } from "./gallery";
 import { createJob, findJob, jobFile, toView } from "./jobs";
-import type { PlannerChoice } from "./types";
 
 const PORT = Number(process.env.WORKER_PORT) || 8787;
 const HOST = process.env.WORKER_HOST?.trim() || "127.0.0.1";
 const TOKEN = process.env.WORKER_TOKEN?.trim() || null;
-const PLANNERS: PlannerChoice[] = ["haiku", "sonnet", "opus", "none"];
 const MAX_BODY = 10_000;
 const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -45,7 +43,7 @@ function send(res: http.ServerResponse, status: number, body: unknown, headers: 
 }
 
 type JobRequest =
-  | { ok: true; url: URL; planner: PlannerChoice; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined }
+  | { ok: true; url: URL; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined }
   | { ok: false; status: number; error: string };
 
 /** Parses and checks an order for a trailer. The URL is vetted before anything is charged. */
@@ -58,7 +56,6 @@ async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
   }
   const rawUrl = typeof body.url === "string" ? body.url.trim().slice(0, 2000) : "";
   if (!rawUrl) return { ok: false, status: 400, error: "Paste a link to your app." };
-  const planner = PLANNERS.includes(body.planner as PlannerChoice) ? (body.planner as PlannerChoice) : "sonnet";
   let url: URL;
   try {
     url = await assertPublicUrl(rawUrl);
@@ -69,7 +66,6 @@ async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
   return {
     ok: true,
     url,
-    planner,
     options: parseOptions(body),
     gallery: body.gallery !== false,
     fresh: body.fresh === true,
@@ -123,7 +119,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     }
     const decision = await admit(order.code, visitorOf(req));
     if (!decision.ok) return send(res, 403, { error: decision.reason, needsCode: decision.needsCode ?? false });
-    const job = createJob(order.url.href, order.planner, order.fresh, order.options, order.gallery);
+    const job = createJob(order.url.href, order.fresh, order.options, order.gallery);
     console.log(`job ${job.id.slice(0, 8)} admitted${decision.code ? ` with code ${decision.code}` : ""}`);
     return send(res, 202, { id: job.id });
   }
@@ -135,14 +131,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (!paymentsEnabled()) {
       const decision = await admit(order.code, visitorOf(req));
       if (!decision.ok) return send(res, 403, { error: decision.reason });
-      const job = createJob(order.url.href, order.planner, false, order.options, order.gallery);
+      const job = createJob(order.url.href, false, order.options, order.gallery);
       console.log(`job ${job.id.slice(0, 8)} ordered over x402 (free)`);
       return send(res, 202, { ...jobLinks(job.id), free: true, note: "Trailers are free until Vibestarter Vibeathon 02 ends." });
     }
     const signature = req.headers["payment-signature"];
     const paid = await charge(typeof signature === "string" ? signature : undefined);
     if (!paid.ok) return send(res, paid.status, { error: paid.error }, paid.headers);
-    const job = createJob(order.url.href, order.planner, false, order.options, order.gallery);
+    const job = createJob(order.url.href, false, order.options, order.gallery);
     console.log(`job ${job.id.slice(0, 8)} paid by ${paid.payer}, tx ${paid.transaction}`);
     return send(res, 202, { ...jobLinks(job.id), free: false, transaction: paid.transaction }, paid.headers);
   }

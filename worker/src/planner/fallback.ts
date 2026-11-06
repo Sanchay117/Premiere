@@ -207,6 +207,8 @@ export function fallbackPlan(c: Capture): Plan {
     shots,
     close: asSentence(`Try ${name} today at ${hostLabel(c.finalUrl)}`),
     cta: "Try it now",
+    // Nothing looked at the page, so a person decides whether it reaches the gallery.
+    publicSafe: false,
   };
   fitWords(plan, material);
   return plan;

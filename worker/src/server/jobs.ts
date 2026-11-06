@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { CaptureError } from "../capture/capture";
 import { loadOrCapture } from "../capture/store";
-import { config, MODELS } from "../config";
+import { aliasOf, config, MODELS } from "../config";
 import type { TrailerOptions } from "../options";
 import { makeTrailer } from "../pipeline/trailer";
 import { planTrailer } from "../planner/index";
@@ -76,7 +76,10 @@ function finishStep(job: Job, key: StepKey, status: "done" | "failed", detail: s
   touch(job);
 }
 
-export function createJob(url: string, planner: PlannerChoice, fresh: boolean, options: TrailerOptions, gallery: boolean): Job {
+/** Every job's script is written by the configured model (PLANNER_MODEL, Claude Opus 5.5 unless
+ *  set), with the no-AI planner as the fallback when Claude is unavailable or over budget. */
+export function createJob(url: string, fresh: boolean, options: TrailerOptions, gallery: boolean): Job {
+  const planner: PlannerChoice = aliasOf(config.model);
   const id = randomUUID();
   const job: Job = {
     id,
@@ -145,6 +148,10 @@ export function jobFile(job: Job, name: string): string | null {
   return null;
 }
 
+let finishedAt = 0;
+/** When a job last finished, so the gallery knows its cached list may be out of date. */
+export const lastFinishedAt = () => finishedAt;
+
 function pump(): void {
   while (running < CONCURRENCY && queue.length > 0) {
     const id = queue.shift()!;
@@ -155,6 +162,7 @@ function pump(): void {
       .catch((err) => console.error(`job ${id} crashed:`, err))
       .finally(() => {
         running--;
+        finishedAt = Date.now();
         saveJob(job).catch((err) => console.error(`job ${id} could not be saved:`, err));
         pump();
       });

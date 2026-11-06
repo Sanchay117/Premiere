@@ -1,15 +1,19 @@
-// The gallery of past trailers. A trailer is shown only when its maker opted in and we approved
-// it (npm run gallery -- approve <id>): the worker films any URL someone pastes, so nothing
-// reaches the public wall without a person looking at it first.
+// The gallery of past trailers. A finished trailer goes up on its own when its maker opted in and
+// Claude, while planning it, found the page fit for a public wall (plan.publicSafe). Anything else
+// waits for a person: `npm run gallery -- approve <id>` puts it up, `remove <id>` takes any
+// trailer down. The worker films any URL someone pastes, so nothing goes up unchecked.
 
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config";
 import { hostLabel } from "../lib/url";
-import { findJob, type Job } from "./jobs";
+import { findJob, lastFinishedAt, type Job } from "./jobs";
 
 interface GalleryState {
+  /** Put up by hand, even though Claude did not clear them (or no Claude call was made). */
   approved: string[];
+  /** Taken down by hand. Wins over everything else. */
+  removed: string[];
 }
 
 export interface GalleryEntry {
@@ -26,12 +30,14 @@ export interface GalleryEntry {
 
 const FILE = path.join(config.dataDir, "gallery.json");
 
+const ids = (value: unknown) => (Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []);
+
 export async function readGallery(): Promise<GalleryState> {
   try {
     const state = JSON.parse(await readFile(FILE, "utf8")) as Partial<GalleryState>;
-    return { approved: Array.isArray(state.approved) ? state.approved.filter((id) => typeof id === "string") : [] };
+    return { approved: ids(state.approved), removed: ids(state.removed) };
   } catch {
-    return { approved: [] };
+    return { approved: [], removed: [] };
   }
 }
 
@@ -41,12 +47,35 @@ async function writeGallery(state: GalleryState): Promise<void> {
   await rename(`${FILE}.tmp`, FILE);
 }
 
-/** Whether a finished job can appear in the gallery at all. */
-export function showable(job: Job | undefined): job is Job & { result: NonNullable<Job["result"]> } {
+type Finished = Job & { result: NonNullable<Job["result"]> };
+
+/** Whether a job could appear at all: finished, with a trailer, and its maker opted in. */
+export function showable(job: Job | undefined): job is Finished {
   return Boolean(job && job.status === "done" && job.gallery && job.result?.trailer);
 }
 
-function entry(job: Job & { result: NonNullable<Job["result"]> }): GalleryEntry {
+export type Listing = "listed" | "held" | "removed" | "opted out" | "unfinished";
+
+/** Where a job stands with the gallery. */
+export function listing(job: Job, state: GalleryState): Listing {
+  if (job.status !== "done" || !job.result?.trailer) return "unfinished";
+  if (!job.gallery) return "opted out";
+  if (state.removed.includes(job.id)) return "removed";
+  if (state.approved.includes(job.id) || job.result.plan.publicSafe === true) return "listed";
+  return "held";
+}
+
+/** One trailer per app on the wall: the same host and path count as the same app. */
+function appKey(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
+  } catch {
+    return url;
+  }
+}
+
+function entry(job: Finished): GalleryEntry {
   return {
     id: job.id,
     appName: job.result.plan.appName,
@@ -60,26 +89,31 @@ function entry(job: Job & { result: NonNullable<Job["result"]> }): GalleryEntry 
   };
 }
 
-export async function setApproved(id: string, approved: boolean): Promise<GalleryState> {
+export async function setListing(id: string, action: "approve" | "remove"): Promise<GalleryState> {
   const state = await readGallery();
-  const rest = state.approved.filter((x) => x !== id);
-  const next = { approved: approved ? [id, ...rest] : rest };
+  const approved = state.approved.filter((x) => x !== id);
+  const removed = state.removed.filter((x) => x !== id);
+  const next = action === "approve" ? { approved: [id, ...approved], removed } : { approved, removed: [id, ...removed] };
   await writeGallery(next);
   return next;
 }
 
 let cached: { at: number; entries: GalleryEntry[] } | null = null;
 
-/** Approved trailers, newest first. Cached for a minute; approving clears the cache. */
+/** Listed trailers, newest first, the newest one per app. Cached for a minute, or until a job
+ *  finishes, so a new trailer is on the wall as soon as it is rendered. */
 export async function galleryEntries(limit = 48): Promise<GalleryEntry[]> {
-  if (cached && Date.now() - cached.at < 60_000) return cached.entries.slice(0, limit);
-  const { approved } = await readGallery();
+  if (cached && Date.now() - cached.at < 60_000 && cached.at > lastFinishedAt()) return cached.entries.slice(0, limit);
+  const state = await readGallery();
+  const seen = new Set<string>();
   const entries: GalleryEntry[] = [];
-  for (const id of approved) {
-    const job = await findJob(id);
-    if (showable(job)) entries.push(entry(job));
+  for (const job of await savedJobs()) {
+    if (!showable(job) || listing(job, state) !== "listed") continue;
+    const key = appKey(job.result.capture.finalUrl);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push(entry(job));
   }
-  entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   cached = { at: Date.now(), entries };
   return entries.slice(0, limit);
 }
@@ -88,7 +122,8 @@ export function clearGalleryCache(): void {
   cached = null;
 }
 
-/** Every saved job, newest first, for the gallery CLI. */
+/** Every saved job, newest first. Live jobs come from memory, so a trailer that has just
+ *  finished counts before its job.json is written. */
 export async function savedJobs(): Promise<Job[]> {
   const root = path.join(config.dataDir, "jobs");
   const names = await readdir(root).catch(() => [] as string[]);

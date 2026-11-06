@@ -62,8 +62,9 @@ export const config = {
   /** Premiere's own Console key. Missing key means the planner falls back to the no-AI plan. */
   apiKey: process.env.PREMIERE_ANTHROPIC_API_KEY?.trim() || null,
   planner: parseChoice(process.env.PLANNER, PLANNERS, "claude", "PLANNER"),
-  // Sonnet 5.5 won the 6 Nov bake-off on script quality per dollar (see CLAUDE.md).
-  model: resolveModel(process.env.PLANNER_MODEL?.trim() || "sonnet"),
+  // Opus 5.5 writes every script: in the 6 Nov bake-off it kept closest to the length target and
+  // picked the best actions, at about twice Sonnet's cost (see CLAUDE.md).
+  model: resolveModel(process.env.PLANNER_MODEL?.trim() || "opus"),
   effort: parseChoice(process.env.PLANNER_EFFORT, EFFORTS, "low", "PLANNER_EFFORT"),
   monthlyBudgetUsd: parseNumber(process.env.PLANNER_MONTHLY_BUDGET_USD, 5, "PLANNER_MONTHLY_BUDGET_USD"),
   /** Deepgram key for narration (Aura-2 text to speech). Missing key means the Kokoro fallback voice. */

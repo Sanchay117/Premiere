@@ -119,6 +119,8 @@ export function validatePlan(raw: PlanInput, capture: Capture, style: TrailerSty
     shots,
     close: asSentence(raw.close),
     cta: truncateWords(sanitizeScript(raw.cta), 6) || "Try it now",
+    // Only a model that looked at the page can clear it for the public gallery.
+    publicSafe: raw.publicSafe === true,
   };
 
   const words = planWords(plan);

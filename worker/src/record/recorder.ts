@@ -50,6 +50,29 @@ export interface Recording {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
+/** Whether a dialog, menu or list a click opened is still showing. */
+function overlayOpen(page: Page): Promise<boolean> {
+  return page
+    .evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open], [role="menu"], [role="listbox"]')].some((el) => {
+        const r = el.getBoundingClientRect();
+        const s = getComputedStyle(el);
+        return r.width > 40 && r.height > 40 && s.display !== "none" && s.visibility !== "hidden" && Number(s.opacity) > 0.1;
+      }),
+    )
+    .catch(() => false);
+}
+
+/** A dialog or menu a previous click opened would sit over every later shot: Uniswap's token
+ *  picker covered the next four. Nothing later can be aimed inside it, since the page was mapped
+ *  with it closed, so it is closed with Escape during the next shot's setup, off camera. */
+export async function closeOverlays(page: Page): Promise<void> {
+  for (let attempt = 0; attempt < 2 && (await overlayOpen(page)); attempt++) {
+    await page.keyboard.press("Escape").catch(() => {});
+    await sleep(300);
+  }
+}
+
 /** Finds a captured element again on the live page, checking it still says the same thing. */
 async function locate(page: Page, el: CapturedElement): Promise<Locator | null> {
   const name = el.text.slice(0, 60);
@@ -223,6 +246,7 @@ export async function recordPlan(capture: Capture, plan: Plan, options: RecordOp
 
     // One shot: setup off camera, lead-in, action, hold.
     async function filmShot(p: Page, shot: Shot, index: number, hold: number): Promise<RecordedShot> {
+      if (index > 0) await closeOverlays(p);
       const el = shot.target ? elements.get(shot.target) : undefined;
       const section = shot.target ? sections.get(shot.target) : undefined;
       let locator: Locator | null = null;

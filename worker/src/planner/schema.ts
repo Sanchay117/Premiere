@@ -18,7 +18,7 @@ export const ShotSchema = z.object({
     .string()
     .nullable()
     .describe("For type only: a short, harmless example to type, at most 60 characters. Null for every other action."),
-  narration: z.string().describe("Line spoken during this shot, 8 to 18 words, about what is on screen."),
+  narration: z.string().describe("Line spoken during this shot, 8 to 15 words, about what is on screen."),
 });
 
 export const PlanSchema = z.object({
@@ -26,7 +26,7 @@ export const PlanSchema = z.object({
   tagline: z.string().describe("Title card subtitle, at most 8 words."),
   mood: z.enum(["energetic", "calm", "playful", "bold"]).describe("Music mood that suits the app."),
   hook: z.string().describe("Opening line spoken over the title card, 6 to 12 words."),
-  shots: z.array(ShotSchema).describe("5 to 8 shots in story order."),
+  shots: z.array(ShotSchema).describe("5 to 7 shots in story order."),
   close: z.string().describe("Closing line spoken over the end card, inviting the viewer to try the app, 6 to 12 words."),
   cta: z.string().describe("End card button text, at most 5 words, for example: Try it free."),
 });

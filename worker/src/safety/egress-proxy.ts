@@ -82,8 +82,18 @@ export async function startEgressProxy({ resolveHost = resolvePublicHost }: Egre
     req.pipe(upstream);
   });
 
+  // Every socket this proxy touches, so close() can tear them all down. Tunnel sockets are not
+  // tracked by the HTTP server once upgraded, and a half-open one would block server.close().
+  const sockets = new Set<net.Socket>();
+  const track = (socket: net.Socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+  };
+  server.on("connection", track);
+
   // HTTPS and WebSocket traffic arrives as CONNECT host:port tunnels.
   server.on("connect", async (req: http.IncomingMessage, client: net.Socket, head: Buffer) => {
+    track(client);
     client.on("error", () => {});
     let hostname: string;
     let port: number;
@@ -101,18 +111,25 @@ export async function startEgressProxy({ resolveHost = resolvePublicHost }: Egre
       return;
     }
     const upstream = net.connect({ host: addresses[0], port });
+    track(upstream);
     upstream.setTimeout(SOCKET_TIMEOUT_MS, () => upstream.destroy());
+    let established = false;
     upstream.on("connect", () => {
+      established = true;
       client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
       if (head.length) upstream.write(head);
       upstream.pipe(client);
       client.pipe(upstream);
     });
     upstream.on("error", () => {
-      if (client.writable) client.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+      if (!established && client.writable) client.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
       else client.destroy();
     });
+    // When either side finishes, finish the other, so no tunnel is left half-open.
+    client.on("end", () => upstream.end());
+    upstream.on("end", () => client.end());
     client.on("close", () => upstream.destroy());
+    upstream.on("close", () => client.destroy());
   });
 
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
@@ -123,8 +140,14 @@ export async function startEgressProxy({ resolveHost = resolvePublicHost }: Egre
     blocked,
     close: () =>
       new Promise<void>((done) => {
+        for (const socket of sockets) socket.destroy();
         server.closeAllConnections();
-        server.close(() => done());
+        // Never let shutdown hang a job: resolve after a second regardless.
+        const timer = setTimeout(done, 1000);
+        server.close(() => {
+          clearTimeout(timer);
+          done();
+        });
       }),
   };
 }

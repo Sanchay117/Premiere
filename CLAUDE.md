@@ -8,7 +8,7 @@ This is our entry for **Vibestarter Vibeathon 02: Night shift**. This repo will 
 
 The build window closes **9 Nov 2026, 22:00 UTC (10 Nov, 03:30 IST)**. Aim to submit by 8 Nov.
 
-As of 6 Nov: the worker has capture (Playwright, labelled screenshots, egress proxy), the planner (one Claude call, no-AI fallback, mock plans, plan cache, spend guard) and a model bake-off harness. The bake-off picked **Sonnet 5.5** as the planner model. Not built yet: record, voice, music, render, web app, queue, payments.
+As of 6 Nov: the worker has capture (Playwright, labelled screenshots, egress proxy), the planner (one Claude call, no-AI fallback, mock plans, plan cache, spend guard), a model bake-off harness and an HTTP job server. The bake-off picked **Sonnet 5.5** as the planner model. The website runs locally: the drive-in landing page and the screening room, where a job shows live progress and a storyboard preview built from the screenshots and the plan, with a planner picker for testing. Not built yet: record, voice, music, render (so no trailer.mp4 yet), entrant codes, payments, hosting.
 
 ## The hackathon
 
@@ -72,8 +72,8 @@ Every claim in that text has to be true at submission: real footage, 45 seconds,
 web (site + API)  ->  job queue  ->  worker  ->  storage  ->  web shows the result
 ```
 
-- **Web:** Next.js on Vercel. Landing page, job form, job status page, payment and x402 routes.
-- **Queue and storage:** a free-tier hosted database for jobs, and object storage for the outputs. Pick the simplest option and note the choice here.
+- **Web:** Next.js on Vercel. Landing page, job form, job status page, payment and x402 routes. Built in `web/` (Next.js 16, Tailwind v4, Motion, Lenis). Its `/api/jobs` routes proxy to the worker server-side (`WORKER_URL`, `WORKER_TOKEN`), so the browser never talks to the worker.
+- **Queue and storage:** for now the worker runs its own HTTP job server (`worker/src/server`) with an in-memory queue (one job at a time) and serves screenshots from disk. That is the simplest thing that works locally; before judging week decide whether it stays (worker on the VPS behind HTTPS with `WORKER_TOKEN`) or moves to a hosted database and object storage, and note the choice here.
 - **Worker:** a Node process with Playwright, Remotion and ffmpeg. It cannot run on Vercel. Run it on the dev machine during development and on a small VPS for judging week (9 to 16 Nov), so it doesn't depend on a laptop staying awake.
 
 ### Repo layout and commands
@@ -87,6 +87,7 @@ npm workspaces, Node 22 or later (developed on Node 26). Root scripts forward to
 
 | Command | What it does |
 | --- | --- |
+| `npm run dev` | Worker job server (port 8787) and the website (port 3000) together |
 | `npm run capture -- <url>` | Fresh capture; prints elements, sections and screenshot paths |
 | `npm run plan -- <url> [--planner claude\|mock\|fallback] [--model haiku\|sonnet\|opus] [--fresh] [--save-mock]` | Plans one trailer the way a job would and prints the script |
 | `npm run bakeoff -- [urls] [--models haiku,sonnet,opus] [--effort low] [--save-mock <model>]` | Plans each app with every model plus the fallback; writes a side-by-side report |
@@ -110,7 +111,8 @@ npm workspaces, Node 22 or later (developed on Node 26). Root scripts forward to
 - Structured output via `output_config.format` with `PLAN_JSON_SCHEMA` (built from the zod schema). Do not switch to the SDK's `zodOutputFormat` helper: it turns `enum` into a description hint.
 - Exactly **one** planning call per trailer. Never a screenshot-act-screenshot agent loop.
 - Check `stop_reason`. On `refusal`, `max_tokens` or invalid JSON, use the fallback planner.
-- Plans are cached per normalized URL, so re-rendering the same app costs nothing.
+- Plans are cached per normalized URL and model, tied to the capture they were made from (element ids only hold for that capture), so re-rendering the same app costs nothing.
+- Prompt version 3 asks for 5 to 7 shots, shot lines of 8 to 15 words and no more than 125 words in total; version 2 let Sonnet run to about 137 words (a 55 second trailer). Bump `PROMPT_VERSION` whenever the prompt or schema changes.
 - `PLANNER=mock` returns saved example plans. Use it for all work on recording, voice and rendering.
 - Every plan, from any planner, goes through `validatePlan`: unknown ids, external, mailto and destructive clicks, and typing into sensitive fields are dropped; em dashes are cleaned out of the copy.
 - **Fallback planner (no AI):** hold on the hero, hover the primary call to action, scroll to the strongest sections (or hover the controls of a single-screen app), then click in, with a script built only from the page's own prose (description, headings, visible text). The app must keep working at $0 if the API is unavailable or the budget is hit.
@@ -131,6 +133,15 @@ The worker opens arbitrary URLs, so treat every submitted URL as hostile:
 - How: the URL is checked before launch, then every browser connection goes through a local egress proxy (`safety/egress-proxy.ts`) that resolves the host itself, refuses non-public addresses and connects to the exact IP it checked. This covers redirects, subresources, iframes and DNS rebinding. Playwright's `route()` is not enough on its own: redirect hops skip it.
 - No downloads, no file access, no extra permissions. Fresh browser context per job.
 - Hard limits on page load time, total job time and output size.
+
+## Website design: the night-shift drive-in
+
+The site is a drive-in theater for apps, open all night (the Vibeathon theme). Keep new pages inside this world rather than adding generic SaaS sections.
+
+- **Hero:** the headline in a starry sky (seeded star field, crescent moon, the odd shooting star), the box office form and ticket-stub planner picker on the left, the big screen on posts playing the teaser reel (a made-up app called Nightjar) on the right, a bulb-lit marquee that spells the typed app name on letter tiles, and a lot of 1950s cars seen from behind with the projector beam over them. Mouse parallax moves stars, hills and cars by different amounts.
+- **Sections, as the night's program:** Tonight's program (five reels from 2:00 to 2:05 a.m., with a clock that ticks as you scroll), Intermission (why it is called a trailer: ads spliced onto the end of the reel in 1913; say "one of the earliest", not "the first"), Take-home reels (the four files as film cans), Box office (entrants, founders, agents), Last show of the night, then rolling end credits.
+- **Screening room** (`/jobs/[id]`): the same sky, a film-strip progress view of the five steps, then the storyboard preview player and the script. Steps that are not built yet show "Soon".
+- **Look:** night ink `#07080c`, cream text `#f3ead8`, projector amber `#ffb547`, element-label pink `#e11d74`. Instrument Serif for display, Geist for text, Geist Mono for labels and timecodes, Bebas Neue for marquee tiles. Film grain over everything. Every animation has a `prefers-reduced-motion` fallback.
 
 ## Priorities
 

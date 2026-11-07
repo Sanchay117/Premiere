@@ -76,4 +76,6 @@ export interface JobView {
   options: TrailerOptions;
   /** The person agreed to let Premiere feature this trailer in the gallery. */
   gallery: boolean;
+  /** Director's notes on what to film, if the person gave any. */
+  notes?: string | null;
 }

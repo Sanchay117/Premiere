@@ -13,7 +13,7 @@ import { parseArgs } from "node:util";
 import { loadOrCapture } from "../capture/store";
 import { config, MODELS } from "../config";
 import { normalizeUrl, urlSlug } from "../lib/url";
-import { CAPTION_STYLES, parseOptions, type CaptionStyle } from "../options";
+import { CAPTION_STYLES, parseNotes, parseOptions, type CaptionStyle } from "../options";
 import { makeTrailer, rerenderThumbnails, rerenderTrailer } from "../pipeline/trailer";
 import { planTrailer } from "../planner/index";
 import { fail, seconds } from "./shared";
@@ -30,6 +30,7 @@ const { values, positionals } = parseArgs({
     rerender: { type: "string" },
     length: { type: "string" },
     format: { type: "string" },
+    notes: { type: "string" },
     thumbnails: { type: "boolean", default: false },
   },
 });
@@ -64,7 +65,7 @@ try {
       stored,
       choice === "none"
         ? { planner: "fallback", style: options.style, length: options.length }
-        : { planner: "claude", model: MODELS[choice] ?? config.model, fresh: values.fresh, style: options.style, length: options.length },
+        : { planner: "claude", model: MODELS[choice] ?? config.model, fresh: values.fresh, style: options.style, length: options.length, notes: parseNotes(values.notes) ?? undefined },
     );
     console.log(`Plan: ${planned.source}, ${planned.plan.shots.length} shots, ${planned.words} words (${options.style})`);
 

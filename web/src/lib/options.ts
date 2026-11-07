@@ -5,6 +5,9 @@ import type { CaptionStyle, Narrator, TrailerLength, TrailerOptions, TrailerStyl
 
 export const DEFAULT_OPTIONS: Required<TrailerOptions> = { style: "hype", voice: "auto", captions: "karaoke", length: 45, format: "landscape" };
 
+/** Most a person can say in director's notes (the worker trims to the same). */
+export const NOTES_MAX = 280;
+
 /** Free for everyone until Vibeathon 02 ends (judging and the holder vote close on 16 Nov). */
 export const FREE_UNTIL_LABEL = "16 Nov";
 

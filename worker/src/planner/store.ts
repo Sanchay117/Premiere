@@ -1,6 +1,7 @@
 // Saved plans. The cache makes re-rendering the same app free; mock fixtures (committed, in
 // worker/fixtures/plans) let PLANNER=mock drive recording, voice and render work at $0.
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { aliasOf, config, type Effort, type ModelId } from "../config";
@@ -23,16 +24,20 @@ export interface SavedPlan {
 }
 
 const slug = (c: Capture) => urlSlug(new URL(c.url));
-/** What a plan was written for besides the model: the cut's style and running time. */
+/** What a plan was written for besides the model: the cut's style and running time, and the
+ *  director's notes if there were any. */
 export interface PlanVariant {
   style: TrailerStyle;
   length?: TrailerLength;
+  notes?: string;
 }
+
+const notesKey = (notes: string | undefined) => (notes ? `-notes-${createHash("sha1").update(notes).digest("hex").slice(0, 10)}` : "");
 
 /** One cached plan per URL, model, style and running time, so comparing models never returns
  *  another model's plan and a 15 second hype cut never reuses a 45 second walkthrough. */
-const cachePath = (c: Capture, model: ModelId, { style, length = 45 }: PlanVariant) =>
-  path.join(config.dataDir, "plans", `${slug(c)}-${aliasOf(model)}-${style}${length === 45 ? "" : `-${length}s`}.json`);
+const cachePath = (c: Capture, model: ModelId, { style, length = 45, notes }: PlanVariant) =>
+  path.join(config.dataDir, "plans", `${slug(c)}-${aliasOf(model)}-${style}${length === 45 ? "" : `-${length}s`}${notesKey(notes)}.json`);
 export const mockPath = (c: Capture) => path.join(config.fixturesDir, "plans", `${slug(c)}.json`);
 
 async function readSaved(file: string): Promise<SavedPlan | null> {
@@ -72,8 +77,8 @@ export async function readCachedPlan(c: Capture, model: ModelId, variant: PlanVa
 }
 
 export function writeCachedPlan(c: Capture, plan: Plan, meta: Meta & { model: ModelId } & PlanVariant): Promise<string> {
-  const { style, length, ...rest } = meta;
-  return writeSaved(cachePath(c, meta.model, { style, length }), toSaved(c, plan, rest));
+  const { style, length, notes, ...rest } = meta;
+  return writeSaved(cachePath(c, meta.model, { style, length, notes }), toSaved(c, plan, rest));
 }
 
 export function readMockPlan(c: Capture): Promise<SavedPlan | null> {

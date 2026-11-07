@@ -115,6 +115,11 @@ export function Storyboard({ job }: { job: JobView }) {
         {plan.appName}: <span className="text-cream-dim">the storyboard</span>
       </h2>
       {plan.tagline && <p className="mt-3 text-xl font-semibold text-amber">{plan.tagline}</p>}
+      {job.notes && (
+        <p className="mt-4 max-w-3xl font-mono text-sm text-cream-dim">
+          <span className="font-bold uppercase tracking-[0.14em] text-cream-faint">Director&apos;s notes:</span> {job.notes}
+        </p>
+      )}
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_330px]">
         <Animatic ref={animatic} jobId={job.id} result={result} onScene={onScene} />

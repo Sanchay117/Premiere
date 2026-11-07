@@ -33,6 +33,8 @@ export interface PlanOptions {
   style?: TrailerStyle;
   /** Running time in seconds (45, 30 or 15). Defaults to 45. */
   length?: TrailerLength;
+  /** Director's notes on what to film. The no-AI planner cannot read them. */
+  notes?: string;
 }
 
 function useFallback(stored: StoredCapture, style: TrailerStyle, length: TrailerLength, reason: string, attempt: ClaudeAttempt | null = null): PlanResult {
@@ -58,7 +60,7 @@ export async function planTrailer(stored: StoredCapture, options: PlanOptions = 
   }
 
   if (!options.fresh) {
-    const cached = await readCachedPlan(capture, model, { style, length });
+    const cached = await readCachedPlan(capture, model, { style, length, notes: options.notes });
     if (cached) {
       const v = validatePlan(cached.plan, capture, style, length);
       if (v.usable) {
@@ -67,12 +69,12 @@ export async function planTrailer(stored: StoredCapture, options: PlanOptions = 
     }
   }
 
-  const attempt = await planWithClaude(stored, { model, effort, style, length, ledger: options.ledger ?? SpendLedger.default() });
+  const attempt = await planWithClaude(stored, { model, effort, style, length, notes: options.notes, ledger: options.ledger ?? SpendLedger.default() });
   if (!attempt.plan) return useFallback(stored, style, length, describeFailure(attempt), attempt);
 
   const v = validatePlan(attempt.plan, capture, style, length);
   if (!v.usable) return useFallback(stored, style, length, `the ${aliasOf(model)} plan failed checks: ${v.issues.join("; ")}`, attempt);
 
-  await writeCachedPlan(capture, v.plan, { source: "claude", model, effort, style, length });
+  await writeCachedPlan(capture, v.plan, { source: "claude", model, effort, style, length, notes: options.notes });
   return { plan: v.plan, source: "claude", model, reason: null, issues: v.issues, words: v.words, attempt };
 }

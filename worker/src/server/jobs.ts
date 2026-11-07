@@ -84,7 +84,7 @@ function finishStep(job: Job, key: StepKey, status: "done" | "failed", detail: s
 
 /** Every job's script is written by the configured model (PLANNER_MODEL, Claude Opus 5.5 unless
  *  set), with the no-AI planner as the fallback when Claude is unavailable or over budget. */
-export function createJob(url: string, fresh: boolean, options: TrailerOptions, gallery: boolean): Job {
+export function createJob(url: string, fresh: boolean, options: TrailerOptions, gallery: boolean, extras: { notes?: string | null } = {}): Job {
   const planner: PlannerChoice = aliasOf(config.model);
   const id = randomUUID();
   const job: Job = {
@@ -101,6 +101,7 @@ export function createJob(url: string, fresh: boolean, options: TrailerOptions, 
     result: null,
     options,
     gallery,
+    notes: extras.notes ?? null,
     fresh,
     dir: null,
   };
@@ -220,7 +221,7 @@ async function run(job: Job): Promise<void> {
     );
     const result = await planTrailer(
       stored,
-      job.planner === "none" ? { planner: "fallback", style, length } : { planner: "claude", model: MODELS[job.planner], style, length },
+      job.planner === "none" ? { planner: "fallback", style, length } : { planner: "claude", model: MODELS[job.planner], style, length, notes: job.notes ?? undefined },
     );
     const attempt = result.attempt;
     const shots = result.plan.shots.length;

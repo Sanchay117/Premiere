@@ -66,6 +66,18 @@ export function parseOptions(input: unknown): TrailerOptions {
   };
 }
 
+/** Most a person can say in director's notes. */
+export const NOTES_MAX = 280;
+
+/** Director's notes: one optional line on what the agent should film. Control characters and angle
+ *  brackets go, so the notes cannot close the tags they are sent to Claude in. */
+export function parseNotes(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const printable = [...raw].map((ch) => (ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127 ? " " : ch)).join("");
+  const notes = printable.replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, NOTES_MAX);
+  return notes || null;
+}
+
 /** Options saved before lengths and formats existed get the defaults. */
 export const withDefaults = (options: Partial<TrailerOptions> | undefined): TrailerOptions => ({ ...DEFAULT_OPTIONS, ...options });
 

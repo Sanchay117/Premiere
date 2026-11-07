@@ -6,7 +6,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { DEFAULT_OPTIONS, FREE_UNTIL_LABEL } from "@/lib/options";
+import { DEFAULT_OPTIONS, FREE_UNTIL_LABEL, NOTES_MAX } from "@/lib/options";
 import type { CaptionStyle, Pricing, TrailerLength, TrailerStyle, VoiceChoice } from "@/lib/types";
 import { LetterboxClose } from "./Letterbox";
 import { CaptionPicker, FormLabel, LengthPicker, NarratorDial, StylePicker } from "./pickers";
@@ -18,6 +18,8 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
   const [voice, setVoice] = useState<VoiceChoice>(DEFAULT_OPTIONS.voice);
   const [captions, setCaptions] = useState<CaptionStyle>(DEFAULT_OPTIONS.captions);
   const [gallery, setGallery] = useState(true);
+  const [notes, setNotes] = useState("");
+  const [showNotes, setShowNotes] = useState(false);
   const [code, setCode] = useState("");
   const [needsCode, setNeedsCode] = useState(false);
   const [pricing, setPricing] = useState<Pricing | null>(null);
@@ -43,7 +45,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
       return;
     }
     setState("sending");
-    const order = { url, style, length, voice, captions, gallery, code: code.trim() || undefined };
+    const order = { url, style, length, voice, captions, gallery, notes: notes.trim() || undefined, code: code.trim() || undefined };
     let id: string | undefined;
     try {
       if (paid && pricing) {
@@ -114,6 +116,36 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
             <p role="alert" className="mt-2.5 text-sm font-semibold text-ticket">
               {error}
             </p>
+          )}
+          {showNotes ? (
+            <div className="mt-3">
+              <label htmlFor="notes">
+                <FormLabel>Director&apos;s notes</FormLabel>
+              </label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value.slice(0, NOTES_MAX))}
+                rows={2}
+                maxLength={NOTES_MAX}
+                placeholder="Type a prompt into the generator, then click Generate"
+                className="mt-1.5 block w-full resize-none border-2 border-paper-ink/40 bg-[#fbf6ea] px-3 py-2 font-mono text-[13px] text-paper-ink outline-none placeholder:text-paper-dim/70 focus:border-ticket"
+              />
+              <p className="mt-1 flex justify-between gap-3 text-[12px] leading-snug text-paper-dim">
+                <span>What should the agent show? It still only clicks what is on your page.</span>
+                <span className="shrink-0 font-mono">
+                  {notes.length}/{NOTES_MAX}
+                </span>
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowNotes(true)}
+              className="mt-3 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-ticket hover:underline"
+            >
+              + Add director&apos;s notes
+            </button>
           )}
           {needsCode && (
             <div className="mt-3 flex items-center gap-3">

@@ -112,6 +112,8 @@ export interface JobView {
   /** Missing on jobs made before options existed. */
   options?: TrailerOptions;
   gallery?: boolean;
+  /** Director's notes on what to film, if the person gave any. */
+  notes?: string | null;
 }
 
 export interface GalleryEntry {

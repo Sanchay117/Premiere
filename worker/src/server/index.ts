@@ -18,7 +18,7 @@ import { pipeline } from "node:stream";
 import path from "node:path";
 import { config } from "../config";
 import { assertPublicUrl, UnsafeUrlError } from "../safety/url-guard";
-import { parseOptions, type TrailerOptions } from "../options";
+import { parseNotes, parseOptions, type TrailerOptions } from "../options";
 import { charge, paymentConfig, paymentsEnabled, pricing } from "../payments";
 import { accessRequired, admit } from "./access";
 import { warmRenderer } from "../render/render";
@@ -43,7 +43,7 @@ function send(res: http.ServerResponse, status: number, body: unknown, headers: 
 }
 
 type JobRequest =
-  | { ok: true; url: URL; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined }
+  | { ok: true; url: URL; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined; notes: string | null }
   | { ok: false; status: number; error: string };
 
 /** Parses and checks an order for a trailer. The URL is vetted before anything is charged. */
@@ -70,6 +70,7 @@ async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
     gallery: body.gallery !== false,
     fresh: body.fresh === true,
     code: typeof body.code === "string" ? body.code.slice(0, 64) : undefined,
+    notes: parseNotes(body.notes),
   };
 }
 
@@ -119,7 +120,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     }
     const decision = await admit(order.code, visitorOf(req));
     if (!decision.ok) return send(res, 403, { error: decision.reason, needsCode: decision.needsCode ?? false });
-    const job = createJob(order.url.href, order.fresh, order.options, order.gallery);
+    const job = createJob(order.url.href, order.fresh, order.options, order.gallery, { notes: order.notes });
     console.log(`job ${job.id.slice(0, 8)} admitted${decision.code ? ` with code ${decision.code}` : ""}`);
     return send(res, 202, { id: job.id });
   }
@@ -131,14 +132,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (!paymentsEnabled()) {
       const decision = await admit(order.code, visitorOf(req));
       if (!decision.ok) return send(res, 403, { error: decision.reason });
-      const job = createJob(order.url.href, false, order.options, order.gallery);
+      const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes });
       console.log(`job ${job.id.slice(0, 8)} ordered over x402 (free)`);
       return send(res, 202, { ...jobLinks(job.id), free: true, note: "Trailers are free until 16 Nov 2026." });
     }
     const signature = req.headers["payment-signature"];
     const paid = await charge(typeof signature === "string" ? signature : undefined);
     if (!paid.ok) return send(res, paid.status, { error: paid.error }, paid.headers);
-    const job = createJob(order.url.href, false, order.options, order.gallery);
+    const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes });
     console.log(`job ${job.id.slice(0, 8)} paid by ${paid.payer}, tx ${paid.transaction}`);
     return send(res, 202, { ...jobLinks(job.id), free: false, transaction: paid.transaction }, paid.headers);
   }

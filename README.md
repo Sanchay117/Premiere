@@ -2,6 +2,10 @@
 
 **Paste a URL, get a launch trailer.**
 
+[![Watch the demo: Premiere, from a link to a launch trailer](https://img.youtube.com/vi/LVTVQveyp3U/maxresdefault.jpg)](https://youtu.be/LVTVQveyp3U)
+
+**[Watch the demo on YouTube](https://youtu.be/LVTVQveyp3U)** (2:19): a short trailer, then a real order and a recut on the site.
+
 Premiere opens your app in a real browser, works out what it does, writes a script, clicks through the main flow while it films, and hands back a narrated trailer of about 45 seconds (or a 30 or 15 second cut, wide or vertical) with captions, music and thumbnails. It takes about two and a half minutes. Nobody records anything and nobody edits anything.
 
 Every vibecoded app needs a demo video: for the launch post, the hackathon entry, the raise page. Most founders skip it or lose a day making one. Premiere makes it from the link alone.

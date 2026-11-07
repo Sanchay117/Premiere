@@ -1,7 +1,7 @@
 // What the box office offers, with the words and details the pickers show. The worker validates
 // the same ids (worker/src/options.ts).
 
-import type { CaptionStyle, Narrator, TrailerLength, TrailerOptions, TrailerStyle } from "./types";
+import type { CaptionStyle, Narrator, TrailerFormat, TrailerLength, TrailerOptions, TrailerStyle } from "./types";
 
 export const DEFAULT_OPTIONS: Required<TrailerOptions> = { style: "hype", voice: "auto", captions: "karaoke", length: 45, format: "landscape" };
 
@@ -21,6 +21,12 @@ export const LENGTHS: { id: TrailerLength; name: string; line: string }[] = [
   { id: 45, name: "Trailer", line: "The full story" },
   { id: 30, name: "Teaser", line: "For a launch post" },
   { id: 15, name: "Spot", line: "For ads and stories" },
+];
+
+/** The screen a trailer is made for. */
+export const FORMATS: { id: TrailerFormat; name: string; ratio: string; line: string }[] = [
+  { id: "landscape", name: "Wide", ratio: "16:9", line: "YouTube, X and raise pages" },
+  { id: "vertical", name: "Tall", ratio: "9:16", line: "TikTok, Reels and Shorts" },
 ];
 
 /** Narration word targets, the same as the worker's (worker/src/planner/schema.ts). */

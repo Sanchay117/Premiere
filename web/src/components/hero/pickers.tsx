@@ -5,8 +5,8 @@
 // caption looks.
 
 import { useEffect, useRef, useState } from "react";
-import { CAPTIONS, LENGTHS, NARRATORS, STYLES } from "@/lib/options";
-import type { CaptionStyle, TrailerLength, TrailerStyle, VoiceChoice } from "@/lib/types";
+import { CAPTIONS, FORMATS, LENGTHS, NARRATORS, STYLES } from "@/lib/options";
+import type { CaptionStyle, TrailerFormat, TrailerLength, TrailerStyle, VoiceChoice } from "@/lib/types";
 
 export function FormLabel({ children }: { children: React.ReactNode }) {
   return <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-paper-dim">{children}</span>;
@@ -78,6 +78,40 @@ export function LengthPicker({ value, onChange }: { value: TrailerLength; onChan
               </span>
               <span className="mt-1 block text-[12px] leading-snug text-paper-dim">
                 <span className="font-semibold text-paper-ink">{l.name}.</span> {l.line}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+export function FormatPicker({ value, onChange }: { value: TrailerFormat; onChange: (v: TrailerFormat) => void }) {
+  return (
+    <fieldset>
+      <legend>
+        <FormLabel>The screen</FormLabel>
+      </legend>
+      <div className="mt-2 grid grid-cols-2 gap-2.5">
+        {FORMATS.map((f) => {
+          const on = f.id === value;
+          return (
+            <label
+              key={f.id}
+              className={`flex cursor-pointer items-center gap-3 border-2 px-3 py-2 transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ticket ${
+                on ? "border-ticket bg-ticket/[0.06]" : "border-paper-ink/20 hover:border-paper-ink/50"
+              }`}
+            >
+              <input type="radio" name="format" value={f.id} checked={on} onChange={() => onChange(f.id)} className="sr-only" />
+              {/* A little screen in the shape it makes. */}
+              <span aria-hidden className={`shrink-0 border-2 border-paper-ink/70 ${f.id === "vertical" ? "h-7 w-4" : "h-4 w-7"}`} />
+              <span>
+                <span className="flex items-center gap-2 font-display text-[1.55rem] leading-none tracking-wide">
+                  <TickBox on={on} />
+                  {f.name.toUpperCase()} <span className="font-mono text-[12px] font-bold text-paper-dim">{f.ratio}</span>
+                </span>
+                <span className="mt-1 block text-[12px] leading-snug text-paper-dim">{f.line}</span>
               </span>
             </label>
           );

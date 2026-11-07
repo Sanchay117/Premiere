@@ -98,6 +98,7 @@ const DOWNLOADS = [
 
 export function TrailerReady({ job }: { job: JobView }) {
   const trailer = job.result!.trailer!;
+  const vertical = job.options?.format === "vertical";
   const file = (name: string, download = false) => `/api/jobs/${job.id}/files/${name}${download ? "?download=1" : ""}`;
   const names: Record<(typeof DOWNLOADS)[number]["key"], string | undefined> = {
     video: trailer.video,
@@ -119,14 +120,14 @@ export function TrailerReady({ job }: { job: JobView }) {
       </p>
       <div className="relative mt-6">
         <div aria-hidden className="flicker pointer-events-none absolute -inset-10 -z-10 rounded-[3rem] bg-amber/[0.08] blur-3xl" />
-        <div className="bg-[#16130e] p-[0.9%] shadow-[0_0_70px_rgb(255_214_150/0.2),0_0_220px_rgb(255_181_71/0.12)]">
+        <div className={`bg-[#16130e] p-[0.9%] shadow-[0_0_70px_rgb(255_214_150/0.2),0_0_220px_rgb(255_181_71/0.12)] ${vertical ? "mx-auto max-w-[420px]" : ""}`}>
           <video
             controls
             playsInline
             preload="metadata"
             poster={names.thumb1920 ? file(names.thumb1920) : undefined}
             src={file(trailer.video)}
-            className="block aspect-video w-full bg-black"
+            className={`block w-full bg-black ${vertical ? "aspect-[9/16]" : "aspect-video"}`}
           />
         </div>
       </div>
@@ -140,7 +141,7 @@ export function TrailerReady({ job }: { job: JobView }) {
               <svg viewBox="0 0 24 24" className="size-4 text-amber" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                 <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <TicketText label={d.label} note={d.note} />
+              <TicketText label={d.label} note={vertical && d.key === "video" ? "MP4, 1080 × 1920" : d.note} />
             </a>
           );
         })}

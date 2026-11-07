@@ -28,7 +28,12 @@ export function RemotionRoot() {
         fps={30}
         durationInFrames={150}
         defaultProps={trailerDefaults}
-        calculateMetadata={({ props }) => ({ durationInFrames: props.durationInFrames, fps: props.fps })}
+        // A vertical cut swaps the frame's sides; everything else follows the props.
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.durationInFrames,
+          fps: props.fps,
+          ...(props.format === "vertical" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 }),
+        })}
       />
       <Still id="Thumbnail" component={Thumbnail} width={1920} height={1080} defaultProps={thumbnailDefaults} />
     </>

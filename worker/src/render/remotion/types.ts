@@ -1,7 +1,7 @@
 // Props passed from the worker into the Remotion compositions. Type aliases (not interfaces) so
 // they satisfy Remotion's Record<string, unknown> constraint.
 
-import type { CaptionStyle, TrailerStyle } from "../../options";
+import type { CaptionStyle, TrailerFormat, TrailerStyle } from "../../options";
 
 export type Box = { x: number; y: number; w: number; h: number };
 
@@ -39,6 +39,8 @@ export type TrailerProps = {
   captions?: CaptionStyle;
   /** The app's own color for type, captions and the end card (render/thumbnail.ts). Amber when missing. */
   accent?: string;
+  /** Landscape (1920 by 1080) or vertical (1080 by 1920). Landscape when missing. */
+  format?: TrailerFormat;
 };
 
 export type ThumbnailProps = {

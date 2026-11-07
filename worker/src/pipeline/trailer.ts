@@ -200,6 +200,7 @@ export async function makeTrailer(
     frames: recording.frames,
     soundtrack: "soundtrack.wav",
     style: options.style,
+    format: options.format,
     // Without a narrator the captions carry the script, so they cannot be switched off.
     captions: !voiced.narrated && options.captions === "off" ? "boxed" : options.captions,
   };

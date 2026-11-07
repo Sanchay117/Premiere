@@ -7,14 +7,15 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { DEFAULT_OPTIONS, FREE_UNTIL_LABEL, NOTES_MAX } from "@/lib/options";
-import type { CaptionStyle, Pricing, TrailerLength, TrailerStyle, VoiceChoice } from "@/lib/types";
+import type { CaptionStyle, Pricing, TrailerFormat, TrailerLength, TrailerStyle, VoiceChoice } from "@/lib/types";
 import { LetterboxClose } from "./Letterbox";
-import { CaptionPicker, FormLabel, LengthPicker, NarratorDial, StylePicker } from "./pickers";
+import { CaptionPicker, FormatPicker, FormLabel, LengthPicker, NarratorDial, StylePicker } from "./pickers";
 
 export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrlChange: (url: string) => void }) {
   const router = useRouter();
   const [style, setStyle] = useState<TrailerStyle>(DEFAULT_OPTIONS.style);
   const [length, setLength] = useState<TrailerLength>(DEFAULT_OPTIONS.length);
+  const [format, setFormat] = useState<TrailerFormat>(DEFAULT_OPTIONS.format);
   const [voice, setVoice] = useState<VoiceChoice>(DEFAULT_OPTIONS.voice);
   const [captions, setCaptions] = useState<CaptionStyle>(DEFAULT_OPTIONS.captions);
   const [gallery, setGallery] = useState(true);
@@ -52,6 +53,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
       url,
       style,
       length,
+      format,
       voice,
       captions,
       // A trailer filmed signed in shows a private account, so it stays out of the gallery.
@@ -207,6 +209,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
 
         <StylePicker value={style} onChange={setStyle} />
         <LengthPicker value={length} onChange={setLength} />
+        <FormatPicker value={format} onChange={setFormat} />
         <NarratorDial value={voice} onChange={setVoice} />
         <CaptionPicker value={captions} onChange={setCaptions} />
 

@@ -18,6 +18,53 @@ import type { AppInfo, CaptionWord, TrailerProps, TrailerSegment } from "./types
 const Accent = createContext<string>(COLORS.amber);
 const useAccent = () => useContext(Accent);
 
+/** The vertical cut (1080 by 1920, for TikTok, Reels and Shorts). The 16:9 footage rides across
+ *  the middle as a card, zoomed a little further toward each target so the app reads on a phone;
+ *  the app's name sits above it and the captions below, the way vertical screen recordings are
+ *  laid out. Titles and end cards are the same scenes, sized to the frame's width. */
+const Vertical = createContext(false);
+const useVertical = () => useContext(Vertical);
+const VW = 1080;
+/** Where the footage card's center sits in the vertical frame. */
+const CARD_CENTER = 860;
+/** The footage card's height at full width: 1920 by 1080 scaled to 1080 wide. */
+const CARD_H = (1080 * VW) / 1920;
+
+/** A 1920 by 1080 scene scaled into the vertical frame's card. zoom above 1 lets a scene that
+ *  floats inside its frame (the hype window) fill the card's width. */
+function VerticalStage({ zoom = 1, rounded = false, children }: { zoom?: number; rounded?: boolean; children: React.ReactNode }) {
+  const scale = (VW / W) * zoom;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: VW / 2 - (W * scale) / 2,
+        top: CARD_CENTER - (H * scale) / 2,
+        width: W,
+        height: H,
+        transform: `scale(${scale})`,
+        transformOrigin: "0 0",
+        ...(rounded ? { borderRadius: 26 / scale, overflow: "hidden", boxShadow: "0 60px 140px -30px rgba(0,0,0,0.9)" } : {}),
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** The app's name and address above the footage card, so the tall frame never sits empty. */
+function VerticalHeader({ app }: { app: AppInfo }) {
+  const accent = useAccent();
+  const frame = useCurrentFrame();
+  const name = app.name.toUpperCase();
+  return (
+    <div style={{ position: "absolute", left: 60, right: 60, top: CARD_CENTER - CARD_H / 2 - 300, textAlign: "center", opacity: interpolate(frame, [0, 8], [0, 1], CLAMP) }}>
+      <div style={{ fontFamily: gothic, fontSize: fitTitle(name, "gothic", VW - 160, 150), lineHeight: 0.95, color: COLORS.cream }}>{name}</div>
+      <div style={{ fontFamily: mono, fontSize: 34, color: accent, marginTop: 14 }}>{app.host}</div>
+    </div>
+  );
+}
+
 const W = 1920;
 const H = 1080;
 const CLAMP = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -77,7 +124,7 @@ function NightBackdrop({ glow }: { glow: string }) {
 function TitleCard({ app }: { app: AppInfo }) {
   const accent = useAccent();
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
   const t = frame / fps;
   const spacing = interpolate(t, [0, 1.7], [0.3, 0.01], { ...CLAMP, easing: easeOut });
   return (
@@ -91,7 +138,7 @@ function TitleCard({ app }: { app: AppInfo }) {
           style={{
             fontFamily: serif,
             // One line always: the letter spacing animates, and a wrap would come and go with it.
-            fontSize: fitTitle(app.name, "serif", 1700, 200, false),
+            fontSize: fitTitle(app.name, "serif", Math.min(1700, width - 140), 200, false),
             lineHeight: 1,
             whiteSpace: "nowrap",
             color: COLORS.cream,
@@ -177,7 +224,7 @@ function Pointer({ x, y, scale }: { x: number; y: number; scale: number }) {
 }
 
 /** One filmed shot, full frame: virtual camera, ring, cursor and ripple. Time starts with the footage. */
-function ShotScene({ segment, frames, base }: { segment: TrailerSegment; frames: TrailerProps["frames"]; base: string }) {
+function ShotScene({ segment, frames, base, boost = 1 }: { segment: TrailerSegment; frames: TrailerProps["frames"]; base: string; boost?: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -187,7 +234,7 @@ function ShotScene({ segment, frames, base }: { segment: TrailerSegment; frames:
   const file = pickFrame(frames, (segment.footageStart ?? 0) + t);
 
   // Virtual camera: ease toward the target, keep the window inside the frame.
-  const zoomTarget = box ? (box.w < 140 ? 1.5 : box.w < 480 ? 1.32 : box.w < 1000 ? 1.15 : 1.06) : 1.05;
+  const zoomTarget = (box ? (box.w < 140 ? 1.5 : box.w < 480 ? 1.32 : box.w < 1000 ? 1.15 : 1.06) : 1.05) * boost;
   const progress = interpolate(t, [0, Math.max(0.5, actionAt + 0.5), duration], [0, 0.82, 1], { ...CLAMP, easing: Easing.inOut(Easing.cubic) });
   const scale = 1 + (zoomTarget - 1) * progress;
   const cx = box ? W / 2 + (box.x + box.w / 2 - W / 2) * progress : W / 2;
@@ -267,6 +314,7 @@ function ShotScene({ segment, frames, base }: { segment: TrailerSegment; frames:
 /** Walkthrough: the shot's punch title as a chapter label for its first couple of seconds. */
 function ShotLabel({ text }: { text: string }) {
   const accent = useAccent();
+  const vertical = useVertical();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -277,8 +325,8 @@ function ShotLabel({ text }: { text: string }) {
     <div
       style={{
         position: "absolute",
-        left: 72,
-        top: 64,
+        left: vertical ? 60 : 72,
+        top: vertical ? CARD_CENTER - CARD_H / 2 - 100 : 64,
         display: "flex",
         alignItems: "center",
         gap: 16,
@@ -324,7 +372,7 @@ function Flash({ at, peak = 0.5 }: { at: number; peak?: number }) {
 function HypeTitle({ app }: { app: AppInfo }) {
   const accent = useAccent();
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
   const t = frame / fps;
   const name = app.name.toUpperCase();
   const slam = interpolate(t, [0.2, 0.44], [1.4, 1], { ...CLAMP, easing: easeOut });
@@ -334,7 +382,7 @@ function HypeTitle({ app }: { app: AppInfo }) {
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
       <div style={{ textAlign: "center", marginTop: -40, transform: `scale(${settle})` }}>
-        <div style={{ fontFamily: gothic, fontSize: fitTitle(name, "gothic", 1680, 330), lineHeight: 0.9, maxWidth: 1680, color: COLORS.cream, transform: `scale(${slam})`, opacity: shown }}>
+        <div style={{ fontFamily: gothic, fontSize: fitTitle(name, "gothic", Math.min(1680, width - 120), 330), lineHeight: 0.9, maxWidth: Math.min(1680, width - 120), color: COLORS.cream, transform: `scale(${slam})`, opacity: shown }}>
           {name}
         </div>
         {app.tagline && (
@@ -363,7 +411,7 @@ function HypeTitle({ app }: { app: AppInfo }) {
 function PunchCard({ text, seconds }: { text: string; seconds: number }) {
   const accent = useAccent();
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
   const t = frame / fps;
   const words = text.toUpperCase().split(/\s+/).filter(Boolean);
   const length = words.join(" ").length;
@@ -377,7 +425,7 @@ function PunchCard({ text, seconds }: { text: string; seconds: number }) {
           flexWrap: "wrap",
           justifyContent: "center",
           columnGap: "0.2em",
-          maxWidth: 1640,
+          maxWidth: Math.min(1640, width - 100),
           fontFamily: gothic,
           fontSize: size,
           lineHeight: 0.95,
@@ -467,6 +515,7 @@ function FloatingWindow({ segment, frames, base, index, host }: { segment: Trail
 
 function HypeShot({ segment, frames, base, index, host }: { segment: TrailerSegment; frames: TrailerProps["frames"]; base: string; index: number; host: string }) {
   const { fps } = useVideoConfig();
+  const vertical = useVertical();
   const punchFrames = segment.punchFrames ?? 0;
   return (
     <AbsoluteFill>
@@ -476,7 +525,13 @@ function HypeShot({ segment, frames, base, index, host }: { segment: TrailerSegm
         </Sequence>
       )}
       <Sequence from={punchFrames} layout="none">
-        <FloatingWindow segment={segment} frames={frames} base={base} index={index} host={host} />
+        {vertical ? (
+          <VerticalStage zoom={1.18}>
+            <FloatingWindow segment={segment} frames={frames} base={base} index={index} host={host} />
+          </VerticalStage>
+        ) : (
+          <FloatingWindow segment={segment} frames={frames} base={base} index={index} host={host} />
+        )}
       </Sequence>
     </AbsoluteFill>
   );
@@ -485,7 +540,7 @@ function HypeShot({ segment, frames, base, index, host }: { segment: TrailerSegm
 function HypeEnd({ app }: { app: AppInfo }) {
   const accent = useAccent();
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
   const t = frame / fps;
   const name = app.name.toUpperCase();
   const rise = (from: number) => interpolate(t, [from, from + 0.35], [0, 1], { ...CLAMP, easing: easeOut });
@@ -493,7 +548,7 @@ function HypeEnd({ app }: { app: AppInfo }) {
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: -100 }}>
-        <div style={{ fontFamily: gothic, fontSize: fitTitle(name, "gothic", 1500, 210), lineHeight: 0.9, maxWidth: 1500, textAlign: "center", color: COLORS.cream, opacity: rise(0), transform: `translateY(${(1 - rise(0)) * 30}px)` }}>
+        <div style={{ fontFamily: gothic, fontSize: fitTitle(name, "gothic", Math.min(1500, width - 120), 210), lineHeight: 0.9, maxWidth: Math.min(1500, width - 120), textAlign: "center", color: COLORS.cream, opacity: rise(0), transform: `translateY(${(1 - rise(0)) * 30}px)` }}>
           {name}
         </div>
         <div
@@ -545,8 +600,13 @@ function wordGroups(words: CaptionWord[]): CaptionWord[][] {
 
 function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle }) {
   const accent = useAccent();
+  const vertical = useVertical();
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
+  /** Where the caption block hangs: under the card in the vertical cut (clear of the hype window,
+   *  which tilts past the card's edge), along the bottom otherwise. */
+  const place = (bottom: number) =>
+    vertical ? { justifyContent: "flex-start" as const, paddingTop: CARD_CENTER + CARD_H / 2 + 150 } : { justifyContent: "flex-end" as const, paddingBottom: bottom };
   const t = frame / fps;
   const first = words[0];
   const last = words[words.length - 1];
@@ -565,10 +625,10 @@ function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle })
     const since = t - (group[0]!.start - 0.05);
     const pop = interpolate(since, [0, 0.14], [0.84, 1], { ...CLAMP, easing: Easing.out(Easing.back(2.2)) });
     return (
-      <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 104, opacity }}>
+      <AbsoluteFill style={{ ...place(104), alignItems: "center", opacity }}>
         <div
           style={{
-            maxWidth: 1500,
+            maxWidth: Math.min(1500, width - 100),
             textAlign: "center",
             fontFamily: gothic,
             fontSize: 128,
@@ -593,8 +653,8 @@ function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle })
     return (
       <AbsoluteFill style={{ opacity }}>
         <AbsoluteFill style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.32) 15%, transparent 30%)" }} />
-        <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 84 }}>
-          <div style={{ maxWidth: 1600, textAlign: "center", fontFamily: sans, fontWeight: 700, fontSize: 52, lineHeight: 1.22, textShadow: OUTLINE }}>
+        <AbsoluteFill style={{ ...place(84), alignItems: "center" }}>
+          <div style={{ maxWidth: Math.min(1600, width - 100), textAlign: "center", fontFamily: sans, fontWeight: 700, fontSize: vertical ? 58 : 52, lineHeight: 1.22, textShadow: OUTLINE }}>
             {words.map((w, i) => {
               const next = words[i + 1];
               const active = spoken(w) && (!next || t < next.start - 0.03);
@@ -611,10 +671,10 @@ function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle })
   }
 
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 76, opacity }}>
+    <AbsoluteFill style={{ ...place(76), alignItems: "center", opacity }}>
       <div
         style={{
-          maxWidth: 1640,
+          maxWidth: Math.min(1640, width - 80),
           padding: "16px 34px",
           borderRadius: 20,
           background: "rgba(7,8,12,0.74)",
@@ -638,11 +698,13 @@ function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle })
 
 // ---------------------------------------------------------------------------------------------
 
-export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, soundtrack, style = "walkthrough", captions = "boxed", accent = COLORS.amber }) => {
+export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, soundtrack, style = "walkthrough", captions = "boxed", accent = COLORS.amber, format = "landscape" }) => {
   const hype = style === "hype";
+  const vertical = format === "vertical";
   let shotIndex = 0;
   return (
     <Accent.Provider value={accent}>
+    <Vertical.Provider value={vertical}>
     <AbsoluteFill style={{ backgroundColor: COLORS.ink }}>
       {hype && <HypeBackdrop />}
       {segments.map((segment, i) => {
@@ -653,7 +715,12 @@ export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, s
               <>
                 {segment.kind === "title" && <HypeTitle app={app} />}
                 {segment.kind === "end" && <HypeEnd app={app} />}
-                {segment.kind === "shot" && <HypeShot segment={segment} frames={frames} base={base} index={index} host={app.host} />}
+                {segment.kind === "shot" && (
+                  <>
+                    {vertical && <VerticalHeader app={app} />}
+                    <HypeShot segment={segment} frames={frames} base={base} index={index} host={app.host} />
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -661,7 +728,16 @@ export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, s
                 {segment.kind === "end" && <EndCard app={app} />}
                 {segment.kind === "shot" && (
                   <>
-                    <ShotScene segment={segment} frames={frames} base={base} />
+                    {vertical ? (
+                      <>
+                        <VerticalHeader app={app} />
+                        <VerticalStage rounded>
+                          <ShotScene segment={segment} frames={frames} base={base} boost={1.25} />
+                        </VerticalStage>
+                      </>
+                    ) : (
+                      <ShotScene segment={segment} frames={frames} base={base} />
+                    )}
                     <ShotLabel text={segment.title ?? ""} />
                   </>
                 )}
@@ -673,6 +749,7 @@ export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, s
       })}
       <Audio src={`${base}/${soundtrack}`} />
     </AbsoluteFill>
+    </Vertical.Provider>
     </Accent.Provider>
   );
 };

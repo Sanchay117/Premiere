@@ -56,8 +56,9 @@ export async function rerenderTrailer(
   overrides: { captions?: CaptionStyle } = {},
 ): Promise<RenderOutputs> {
   const edit = await readEdit(jobDir);
-  const trailer = overrides.captions ? { ...edit.trailer, captions: overrides.captions } : edit.trailer;
-  return renderTrailer(jobDir, trailer, await currentThumbnail(jobDir, edit), onProgress);
+  const thumbnail = await currentThumbnail(jobDir, edit);
+  const trailer = { ...edit.trailer, accent: thumbnail.accent, ...(overrides.captions ? { captions: overrides.captions } : {}) };
+  return renderTrailer(jobDir, trailer, thumbnail, onProgress);
 }
 
 /** Renders only a finished job's two thumbnails again, in a few seconds. */
@@ -203,6 +204,10 @@ export async function makeTrailer(
     captions: !voiced.narrated && options.captions === "off" ? "boxed" : options.captions,
   };
 
+  // The footage's best frame and the app's own color, for the thumbnails and the trailer's type.
+  const pick = await chooseThumbnail(jobDir, trailer);
+  trailer.accent = pick.accent;
+
   // The edit is saved before rendering, so a failed or restyled render can be redone from it.
   const edit: EditFile = {
     version: EDIT_VERSION,
@@ -210,7 +215,7 @@ export async function makeTrailer(
     duration: timeline.duration,
     skipped: timeline.skipped,
     trailer,
-    thumbnail: { app, style: options.style, ...(await chooseThumbnail(jobDir, trailer)) },
+    thumbnail: { app, style: options.style, ...pick },
   };
   await writeFile(path.join(jobDir, "edit.json"), JSON.stringify(edit, null, 2));
   const captions = path.join(jobDir, "captions.srt");

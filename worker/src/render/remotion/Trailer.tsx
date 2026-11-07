@@ -5,11 +5,18 @@
 // Both burn in word-timed captions in the chosen look and carry the mastered soundtrack.
 
 import type React from "react";
+import { createContext, useContext } from "react";
 import { AbsoluteFill, Audio, Easing, Img, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CaptionStyle } from "../../options";
 import { fitTitle } from "./fit";
 import { COLORS, gothic, mono, sans, serif } from "./fonts";
 import type { AppInfo, CaptionWord, TrailerProps, TrailerSegment } from "./types";
+
+/** The app's own color (render/thumbnail.ts picks it from the footage) for the type, the captions'
+ *  highlight and the end card, so each trailer looks like its app. The click spotlight and ripple
+ *  stay Premiere's amber: an app-colored ring would vanish against the app's own buttons. */
+const Accent = createContext<string>(COLORS.amber);
+const useAccent = () => useContext(Accent);
 
 const W = 1920;
 const H = 1080;
@@ -68,13 +75,14 @@ function NightBackdrop({ glow }: { glow: string }) {
 // Walkthrough
 
 function TitleCard({ app }: { app: AppInfo }) {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
   const spacing = interpolate(t, [0, 1.7], [0.3, 0.01], { ...CLAMP, easing: easeOut });
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-      <NightBackdrop glow="#2a1d0c" />
+      <NightBackdrop glow={`${accent}2e`} />
       <div style={{ position: "relative", textAlign: "center", marginTop: -90 }}>
         <div style={{ fontFamily: mono, fontSize: 24, letterSpacing: "0.45em", color: "rgba(243,234,216,0.62)", opacity: interpolate(t, [0, 0.5], [0, 1], CLAMP) }}>
           NOW SHOWING
@@ -100,7 +108,7 @@ function TitleCard({ app }: { app: AppInfo }) {
               fontFamily: serif,
               fontStyle: "italic",
               fontSize: 58,
-              color: COLORS.amber,
+              color: accent,
               marginTop: 26,
               opacity: interpolate(t, [0.7, 1.4], [0, 1], CLAMP),
             }}
@@ -114,13 +122,14 @@ function TitleCard({ app }: { app: AppInfo }) {
 }
 
 function EndCard({ app }: { app: AppInfo }) {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
   const pop = interpolate(t, [0.1, 0.55], [0.86, 1], { ...CLAMP, easing: Easing.out(Easing.back(1.6)) });
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-      <NightBackdrop glow="#1f1709" />
+      <NightBackdrop glow={`${accent}24`} />
       <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", marginTop: -110 }}>
         <div
           style={{
@@ -128,12 +137,12 @@ function EndCard({ app }: { app: AppInfo }) {
             fontWeight: 700,
             fontSize: 66,
             color: COLORS.ink,
-            background: COLORS.amber,
+            background: accent,
             borderRadius: 999,
             padding: "24px 60px",
             transform: `scale(${pop})`,
             opacity: interpolate(t, [0.05, 0.35], [0, 1], CLAMP),
-            boxShadow: "0 30px 90px -20px rgba(255,181,71,0.65)",
+            boxShadow: `0 30px 90px -20px ${accent}a6`,
           }}
         >
           {app.cta}
@@ -257,6 +266,7 @@ function ShotScene({ segment, frames, base }: { segment: TrailerSegment; frames:
 
 /** Walkthrough: the shot's punch title as a chapter label for its first couple of seconds. */
 function ShotLabel({ text }: { text: string }) {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -279,7 +289,7 @@ function ShotLabel({ text }: { text: string }) {
         transform: `translateX(${x}px)`,
       }}
     >
-      <div style={{ width: 12, height: 12, borderRadius: "50%", background: COLORS.amber }} />
+      <div style={{ width: 12, height: 12, borderRadius: "50%", background: accent }} />
       <div style={{ fontFamily: sans, fontWeight: 700, fontSize: 30, color: COLORS.cream }}>{text}</div>
     </div>
   );
@@ -290,6 +300,7 @@ function ShotLabel({ text }: { text: string }) {
 
 /** Slow drifting light behind the whole hype cut. Uses the global frame, so it never jumps. */
 function HypeBackdrop() {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const t = frame / 30;
   const a = { x: 30 + 14 * Math.sin(t * 0.31), y: 34 + 9 * Math.cos(t * 0.27) };
@@ -297,7 +308,7 @@ function HypeBackdrop() {
   return (
     <AbsoluteFill
       style={{
-        background: `radial-gradient(circle at ${a.x}% ${a.y}%, rgba(255,181,71,0.2), transparent 44%), radial-gradient(circle at ${b.x}% ${b.y}%, rgba(96,124,255,0.16), transparent 50%), #06070b`,
+        background: `radial-gradient(circle at ${a.x}% ${a.y}%, ${accent}33, transparent 44%), radial-gradient(circle at ${b.x}% ${b.y}%, rgba(96,124,255,0.16), transparent 50%), #06070b`,
       }}
     />
   );
@@ -311,6 +322,7 @@ function Flash({ at, peak = 0.5 }: { at: number; peak?: number }) {
 }
 
 function HypeTitle({ app }: { app: AppInfo }) {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -332,7 +344,7 @@ function HypeTitle({ app }: { app: AppInfo }) {
               fontWeight: 500,
               fontSize: 46,
               letterSpacing: "0.03em",
-              color: COLORS.amber,
+              color: accent,
               marginTop: 30,
               opacity: tag,
               transform: `translateY(${(1 - tag) * 18}px)`,
@@ -349,6 +361,7 @@ function HypeTitle({ app }: { app: AppInfo }) {
 
 /** The punch title on a dark screen: words rise out of their own masks, the last one in amber. */
 function PunchCard({ text, seconds }: { text: string; seconds: number }) {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -376,7 +389,7 @@ function PunchCard({ text, seconds }: { text: string; seconds: number }) {
           const p = interpolate(t, [at, at + 0.2], [0, 1], { ...CLAMP, easing: easeOut });
           return (
             <span key={i} style={{ display: "inline-block", overflow: "hidden", padding: "0.02em 0 0.04em" }}>
-              <span style={{ display: "inline-block", transform: `translateY(${(1 - p) * 108}%)`, color: i === words.length - 1 ? COLORS.amber : COLORS.cream }}>
+              <span style={{ display: "inline-block", transform: `translateY(${(1 - p) * 108}%)`, color: i === words.length - 1 ? accent : COLORS.cream }}>
                 {word}
               </span>
             </span>
@@ -470,6 +483,7 @@ function HypeShot({ segment, frames, base, index, host }: { segment: TrailerSegm
 }
 
 function HypeEnd({ app }: { app: AppInfo }) {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -489,12 +503,12 @@ function HypeEnd({ app }: { app: AppInfo }) {
             fontWeight: 700,
             fontSize: 60,
             color: COLORS.ink,
-            background: COLORS.amber,
+            background: accent,
             borderRadius: 999,
             padding: "22px 58px",
             transform: `scale(${pop})`,
             opacity: rise(0.2),
-            boxShadow: "0 30px 90px -20px rgba(255,181,71,0.6)",
+            boxShadow: `0 30px 90px -20px ${accent}99`,
           }}
         >
           {app.cta}
@@ -530,6 +544,7 @@ function wordGroups(words: CaptionWord[]): CaptionWord[][] {
 }
 
 function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle }) {
+  const accent = useAccent();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -565,7 +580,7 @@ function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle })
           }}
         >
           {group.map((w, i) => (
-            <span key={i} style={{ color: spoken(w) ? (i === group.length - 1 ? COLORS.amber : "#ffffff") : "rgba(255,255,255,0.55)" }}>
+            <span key={i} style={{ color: spoken(w) ? (i === group.length - 1 ? accent : "#ffffff") : "rgba(255,255,255,0.55)" }}>
               {w.text}{" "}
             </span>
           ))}
@@ -584,7 +599,7 @@ function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle })
               const next = words[i + 1];
               const active = spoken(w) && (!next || t < next.start - 0.03);
               return (
-                <span key={i} style={{ color: active ? COLORS.amber : spoken(w) ? "#ffffff" : "rgba(255,255,255,0.62)" }}>
+                <span key={i} style={{ color: active ? accent : spoken(w) ? "#ffffff" : "rgba(255,255,255,0.62)" }}>
                   {w.text}{" "}
                 </span>
               );
@@ -623,10 +638,11 @@ function Captions({ words, look }: { words: CaptionWord[]; look: CaptionStyle })
 
 // ---------------------------------------------------------------------------------------------
 
-export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, soundtrack, style = "walkthrough", captions = "boxed" }) => {
+export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, soundtrack, style = "walkthrough", captions = "boxed", accent = COLORS.amber }) => {
   const hype = style === "hype";
   let shotIndex = 0;
   return (
+    <Accent.Provider value={accent}>
     <AbsoluteFill style={{ backgroundColor: COLORS.ink }}>
       {hype && <HypeBackdrop />}
       {segments.map((segment, i) => {
@@ -657,5 +673,6 @@ export const Trailer: React.FC<TrailerProps> = ({ app, segments, frames, base, s
       })}
       <Audio src={`${base}/${soundtrack}`} />
     </AbsoluteFill>
+    </Accent.Provider>
   );
 };

@@ -37,6 +37,8 @@ export type TrailerProps = {
   /** Missing in edits saved before styles existed: those render as a walkthrough with boxed captions. */
   style?: TrailerStyle;
   captions?: CaptionStyle;
+  /** The app's own color for type, captions and the end card (render/thumbnail.ts). Amber when missing. */
+  accent?: string;
 };
 
 export type ThumbnailProps = {

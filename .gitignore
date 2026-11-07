@@ -21,3 +21,6 @@ dist/
 .DS_Store
 Thumbs.db
 *.log
+
+# Demo video build output: voice, screen recording, soundtrack, render
+demo/.out/

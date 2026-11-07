@@ -1,0 +1,6 @@
+{
+  "name": "@premiere/demo",
+  "private": true,
+  "type": "module",
+  "description": "The demo video: a motion graphics trailer, then a narrated walkthrough of the site."
+}

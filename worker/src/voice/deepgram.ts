@@ -186,10 +186,13 @@ export function silentLines(plan: Plan): VoiceLine[] {
 }
 
 export async function voicePlan(plan: Plan, voice: VoiceChoice, onProgress?: (detail: string) => void): Promise<VoiceLine[]> {
+  return voiceLines(scriptLines(plan), NARRATORS[narratorFor(voice, plan.mood)].model, onProgress);
+}
+
+/** Voices any lines with one Aura-2 model (for example aura-2-zeus-en), each with word timings. */
+export async function voiceLines(lines: { key: string; text: string }[], model: string, onProgress?: (detail: string) => void): Promise<VoiceLine[]> {
   const key = config.deepgramKey;
   if (!key) throw new VoiceError("DEEPGRAM_KEY is not set in .env");
-  const model = NARRATORS[narratorFor(voice, plan.mood)].model;
-  const lines = scriptLines(plan);
   // Deepgram allows 15 Aura-2 requests at once per project. Five lines at a time voices a whole
   // script in about two rounds and leaves room for anything else using the key.
   const results: VoiceLine[] = new Array(lines.length);

@@ -33,7 +33,7 @@ function clickBlockReason(el: CapturedElement): string | null {
 }
 
 /** A punch title: at most 4 words and 32 characters, cleaned like the rest of the copy. */
-function cleanPunch(text: string | null | undefined): string {
+export function cleanPunch(text: string | null | undefined): string {
   const s = sanitizeScript(text ?? "").replace(/\s+/g, " ").trim();
   if (!s) return "";
   const short = truncateWords(s, 4);

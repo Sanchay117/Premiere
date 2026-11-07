@@ -57,6 +57,8 @@ export interface JobResultView {
     narrator: string;
     /** What went differently from the order (no narrator, a simpler reshoot). */
     notes?: string[];
+    /** Its footage was kept, so the screening room can recut it (edit lines, swap the narrator). */
+    canRecut?: boolean;
   } | null;
 }
 
@@ -80,4 +82,6 @@ export interface JobView {
   notes?: string | null;
   /** Filmed signed in through a demo link (the link itself is never shown). */
   demo?: boolean;
+  /** For a recut: the job whose footage it reuses. */
+  recutOf?: string | null;
 }

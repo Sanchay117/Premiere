@@ -9,8 +9,9 @@ import { CaptureError } from "../capture/capture";
 import { captureDemo, loadOrCapture } from "../capture/store";
 import { aliasOf, config, MODELS } from "../config";
 import type { TrailerOptions } from "../options";
-import { makeTrailer } from "../pipeline/trailer";
+import { makeTrailer, recutTrailer, type TrailerHooks, type TrailerResult } from "../pipeline/trailer";
 import { planTrailer } from "../planner/index";
+import { planWords, type Plan } from "../planner/schema";
 import { UnsafeUrlError } from "../safety/url-guard";
 import { VoiceError } from "../voice/deepgram";
 import type { JobStepView, JobView, PlannerChoice, StepKey } from "./types";
@@ -116,6 +117,50 @@ export function createJob(
     fresh,
     dir: null,
   };
+  return enqueue(job);
+}
+
+/** A new take of a finished job: its edited script, read again (by another narrator, if asked)
+ *  and cut over the first take's footage. Capture and plan carry over, so it starts at the voice.
+ *  It never hangs in the gallery: Claude judged the first take's lines, not these. */
+export function createRecut(source: Job, plan: Plan, options: TrailerOptions): Job {
+  const first = source.result!;
+  const id = randomUUID();
+  const at = now();
+  const job: Job = {
+    id,
+    outDir: jobDir(id),
+    url: source.url,
+    planner: source.planner,
+    status: "queued",
+    queuePosition: null,
+    createdAt: at,
+    updatedAt: at,
+    steps: STEPS.map(({ key, label }) =>
+      key === "capture" || key === "plan"
+        ? { key, label, status: "done", detail: "Kept from the first take", startedAt: at, endedAt: at }
+        : { key, label, status: "pending", detail: null, startedAt: null, endedAt: null },
+    ),
+    error: null,
+    result: {
+      capture: first.capture,
+      plan,
+      planner: { ...first.planner, words: planWords(plan), issues: [], costUsd: 0, latencyMs: 0, inputTokens: 0, outputTokens: 0 },
+      trailer: null,
+    },
+    options,
+    gallery: false,
+    demo: source.demo ?? false,
+    demoUrl: null,
+    notes: source.notes ?? null,
+    recutOf: source.id,
+    fresh: false,
+    dir: source.dir,
+  };
+  return enqueue(job);
+}
+
+function enqueue(job: Job): Job {
   jobs.set(job.id, job);
   queue.push(job.id);
   while (jobs.size > MAX_JOBS) {
@@ -200,96 +245,33 @@ function pump(): void {
 async function run(job: Job): Promise<void> {
   job.status = "running";
   touch(job);
-  const { style, voice, captions, length } = job.options;
-  console.log(`job ${job.id.slice(0, 8)} ${job.planner} ${style}/${voice}/${captions} ${job.url}`);
-  let current: StepKey = "capture";
-  try {
-    startStep(job, "capture", "Starting a fresh browser");
-    const onCaptureProgress = (detail: string) => {
-      step(job, "capture").detail = detail;
+  const { style, voice, captions } = job.options;
+  console.log(
+    job.recutOf
+      ? `job ${job.id.slice(0, 8)} recut of ${job.recutOf.slice(0, 8)}, ${voice}/${captions}`
+      : `job ${job.id.slice(0, 8)} ${job.planner} ${style}/${voice}/${captions} ${job.url}`,
+  );
+  let current: StepKey = job.recutOf ? "voice" : "capture";
+  const hooks: TrailerHooks = {
+    onStepStart: (key, detail) => {
+      current = key;
+      startStep(job, key, detail);
+    },
+    onStepProgress: (key, detail) => {
+      if (key === current) step(job, key).detail = detail;
       touch(job);
-    };
-    const stored = job.demoUrl
-      ? await captureDemo(job.url, job.demoUrl, path.join(job.outDir, "capture"), onCaptureProgress)
-      : await loadOrCapture(job.url, { fresh: job.fresh, onProgress: onCaptureProgress });
-    job.dir = stored.dir;
-    const c = stored.capture;
-    const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-    finishStep(
-      job,
-      "capture",
-      "done",
-      [
-        count(c.elements.length, "thing to click", "things to click"),
-        count(c.sections.length, "section", "sections"),
-        count(c.screenshots.length, "screenshot", "screenshots"),
-      ].join(", "),
-    );
-
-    current = "plan";
-    startStep(
-      job,
-      "plan",
-      job.planner === "none" ? "Building a script from the page's own words" : `${PLANNER_NAMES[job.planner]} is writing the ${style} script`,
-    );
-    const result = await planTrailer(
-      stored,
-      job.planner === "none"
-        ? { planner: "fallback", style, length }
-        : { planner: "claude", model: MODELS[job.planner], style, length, notes: job.notes ?? undefined, private: Boolean(job.demoUrl) },
-    );
-    const attempt = result.attempt;
-    const shots = result.plan.shots.length;
-    const planDetail =
-      result.source === "fallback" && job.planner !== "none"
-        ? `Used the free planner instead (${result.reason ?? "unknown reason"})`
-        : `${shots} shots, ${result.words} words${attempt?.costUsd ? `, $${attempt.costUsd.toFixed(3)}` : ""}${result.source === "cache" ? " (cached)" : ""}`;
-    finishStep(job, "plan", "done", planDetail);
-
-    job.result = {
-      capture: {
-        url: c.url,
-        finalUrl: c.finalUrl,
-        title: c.title,
-        description: c.description,
-        pageHeight: c.pageHeight,
-        viewport: c.viewport,
-        screenshots: c.screenshots.map((s) => ({ file: s.file, scrollY: s.scrollY })),
-        elements: c.elements.map((e) => ({ id: e.id, kind: e.kind, text: e.text, box: e.box })),
-        sections: c.sections.map((s) => ({ id: s.id, heading: s.heading, y: s.y })),
-        notes: c.notes,
-        warnings: c.warnings,
-      },
-      plan: result.plan,
-      planner: {
-        source: result.source,
-        model: result.model,
-        reason: result.reason,
-        words: result.words,
-        issues: result.issues,
-        costUsd: attempt?.costUsd ?? 0,
-        latencyMs: attempt?.latencyMs ?? 0,
-        inputTokens: attempt?.usage?.inputTokens ?? 0,
-        outputTokens: attempt?.usage?.outputTokens ?? 0,
-        fallbackRan: attempt?.fallbackRan ?? false,
-      },
-      trailer: null,
-    };
-    touch(job);
-
-    // The storyboard is visible from here; the trailer follows.
-    const trailer = await makeTrailer(stored, result.plan, job.outDir, job.options, {
-      onStepStart: (key, detail) => {
-        current = key;
-        startStep(job, key, detail);
-      },
-      onStepProgress: (key, detail) => {
-        if (key === current) step(job, key).detail = detail;
-        touch(job);
-      },
-      onStepDone: (key, detail) => finishStep(job, key, "done", detail),
-    });
-    job.result.trailer = {
+    },
+    onStepDone: (key, detail) => finishStep(job, key, "done", detail),
+  };
+  try {
+    let trailer: TrailerResult;
+    if (job.recutOf) {
+      // A recut keeps the first take's capture, plan and footage: only the voice and the cut are new.
+      trailer = await recutTrailer(jobDir(job.recutOf), job.outDir, job.result!.capture.finalUrl, job.result!.plan, job.options, hooks);
+    } else {
+      trailer = await firstTake(job, hooks, (key) => (current = key));
+    }
+    job.result!.trailer = {
       video: path.basename(trailer.video),
       thumbnails: trailer.thumbnails.map((t) => path.basename(t)),
       captions: path.basename(trailer.captions),
@@ -298,9 +280,11 @@ async function run(job: Job): Promise<void> {
       shotsSkipped: trailer.shotsSkipped,
       narrator: trailer.voice,
       notes: trailer.notes,
+      // The footage stays with the job, so the screening room can recut it.
+      canRecut: true,
     };
     // After a reshoot the storyboard shows the shots that were actually filmed.
-    job.result.plan = trailer.plan;
+    job.result!.plan = trailer.plan;
     job.status = "done";
     touch(job);
   } catch (err) {
@@ -321,4 +305,84 @@ async function run(job: Job): Promise<void> {
     job.status = "failed";
     touch(job);
   }
+}
+
+/** A first take: open and map the app, write the script, then voice, film and cut it. */
+async function firstTake(job: Job, hooks: TrailerHooks, setCurrent: (key: StepKey) => void): Promise<TrailerResult> {
+  const { style, length } = job.options;
+  startStep(job, "capture", "Starting a fresh browser");
+  const onCaptureProgress = (detail: string) => {
+    step(job, "capture").detail = detail;
+    touch(job);
+  };
+  const stored = job.demoUrl
+    ? await captureDemo(job.url, job.demoUrl, path.join(job.outDir, "capture"), onCaptureProgress)
+    : await loadOrCapture(job.url, { fresh: job.fresh, onProgress: onCaptureProgress });
+  job.dir = stored.dir;
+  const c = stored.capture;
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  finishStep(
+    job,
+    "capture",
+    "done",
+    [
+      count(c.elements.length, "thing to click", "things to click"),
+      count(c.sections.length, "section", "sections"),
+      count(c.screenshots.length, "screenshot", "screenshots"),
+    ].join(", "),
+  );
+
+  setCurrent("plan");
+  startStep(
+    job,
+    "plan",
+    job.planner === "none" ? "Building a script from the page's own words" : `${PLANNER_NAMES[job.planner]} is writing the ${style} script`,
+  );
+  const result = await planTrailer(
+    stored,
+    job.planner === "none"
+      ? { planner: "fallback", style, length }
+      : { planner: "claude", model: MODELS[job.planner], style, length, notes: job.notes ?? undefined, private: Boolean(job.demoUrl) },
+  );
+  const attempt = result.attempt;
+  const shots = result.plan.shots.length;
+  const planDetail =
+    result.source === "fallback" && job.planner !== "none"
+      ? `Used the free planner instead (${result.reason ?? "unknown reason"})`
+      : `${shots} shots, ${result.words} words${attempt?.costUsd ? `, $${attempt.costUsd.toFixed(3)}` : ""}${result.source === "cache" ? " (cached)" : ""}`;
+  finishStep(job, "plan", "done", planDetail);
+
+  job.result = {
+    capture: {
+      url: c.url,
+      finalUrl: c.finalUrl,
+      title: c.title,
+      description: c.description,
+      pageHeight: c.pageHeight,
+      viewport: c.viewport,
+      screenshots: c.screenshots.map((s) => ({ file: s.file, scrollY: s.scrollY })),
+      elements: c.elements.map((e) => ({ id: e.id, kind: e.kind, text: e.text, box: e.box })),
+      sections: c.sections.map((s) => ({ id: s.id, heading: s.heading, y: s.y })),
+      notes: c.notes,
+      warnings: c.warnings,
+    },
+    plan: result.plan,
+    planner: {
+      source: result.source,
+      model: result.model,
+      reason: result.reason,
+      words: result.words,
+      issues: result.issues,
+      costUsd: attempt?.costUsd ?? 0,
+      latencyMs: attempt?.latencyMs ?? 0,
+      inputTokens: attempt?.usage?.inputTokens ?? 0,
+      outputTokens: attempt?.usage?.outputTokens ?? 0,
+      fallbackRan: attempt?.fallbackRan ?? false,
+    },
+    trailer: null,
+  };
+  touch(job);
+
+  // The storyboard is visible from here; the trailer follows.
+  return makeTrailer(stored, result.plan, job.outDir, job.options, hooks);
 }

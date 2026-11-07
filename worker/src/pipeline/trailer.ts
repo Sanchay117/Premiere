@@ -1,7 +1,7 @@
 // Everything after planning: voice, shoot, edit, sound, render. Voice runs first so each shot is
 // filmed for exactly as long as its narration line.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, link, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeLoudness } from "../audio/ffmpeg";
 import { mixSoundtrack } from "../audio/mix";
@@ -13,7 +13,7 @@ import { NARRATORS, narratorFor, type CaptionStyle, type TrailerOptions } from "
 import { fallbackPlan } from "../planner/fallback";
 import type { Plan } from "../planner/schema";
 import { validatePlan } from "../planner/validate";
-import { inFilmingSlot, openStage, recordPlan } from "../record/recorder";
+import { inFilmingSlot, openStage, recordPlan, type Recording } from "../record/recorder";
 import { renderThumbnails, renderTrailer, type RenderOutputs } from "../render/render";
 import { chooseThumbnail } from "../render/thumbnail";
 import { buildTimeline, FPS, shotHolds, toSrt, type Timeline } from "../render/timeline";
@@ -104,6 +104,7 @@ function trailerSegments(timeline: Timeline): TrailerSegment[] {
     };
     if (segment.shot) {
       out.footageStart = segment.shot.footageStart;
+      out.footageEnd = segment.shot.footageEnd;
       out.actionAt = segment.shot.actionAt;
       out.action = segment.shot.action;
       out.box = segment.shot.box;
@@ -162,13 +163,35 @@ export async function makeTrailer(
     notes.push("None of the planned shots could be filmed, so this is a simpler tour of the page.");
   }
   if (filmed === 0) throw new Error("None of the shots could be filmed on this page.");
-  if (!voiced.narrated) notes.unshift("The narrator could not be reached, so this trailer has captions and music only.");
-  else if (voiced.backup) notes.unshift(`The usual narrator could not be reached, so ${voiced.backup}, a backup voice, read this trailer.`);
+  notes.unshift(...voiceNotes(voiced));
   hooks.onStepDone?.(
     "record",
     `${filmed} of ${shotPlan.shots.length} shots filmed${timeline.skipped.length ? `, ${timeline.skipped.length} skipped` : ""}`,
   );
 
+  // The recording stays with the trailer, so a recut can reuse its footage.
+  await writeFile(path.join(jobDir, "recording.json"), JSON.stringify(recording));
+  return cutAndRender({ jobDir, url: capture.finalUrl, host: hostLabel(capture.finalUrl), shotPlan, voiced, recording, timeline, options, filmed, notes }, hooks);
+}
+
+/** Everything the sound, the cut and the render need from a take. */
+interface Take {
+  jobDir: string;
+  /** The app's address, for edit.json. */
+  url: string;
+  /** Its host, for the end card. */
+  host: string;
+  shotPlan: Plan;
+  voiced: Voiced;
+  recording: Recording;
+  timeline: Timeline;
+  options: TrailerOptions;
+  filmed: number;
+  notes: string[];
+}
+
+/** Scores and masters the soundtrack, saves the edit, and renders the trailer and thumbnails. */
+async function cutAndRender({ jobDir, url, host, shotPlan, voiced, recording, timeline, options, filmed, notes }: Take, hooks: TrailerHooks): Promise<TrailerResult> {
   // Sound and cut
   hooks.onStepStart?.("render", "Scoring and mixing the soundtrack");
   const score = synthScore(timeline.duration, shotPlan.mood, {
@@ -189,7 +212,7 @@ export async function makeTrailer(
   await normalizeLoudness(raw, path.join(jobDir, "soundtrack.wav"));
 
   hooks.onStepProgress?.("render", "Cutting the trailer");
-  const app = { name: shotPlan.appName, tagline: shotPlan.tagline, cta: shotPlan.cta, host: hostLabel(capture.finalUrl) };
+  const app = { name: shotPlan.appName, tagline: shotPlan.tagline, cta: shotPlan.cta, host };
   const segments = trailerSegments(timeline);
   const durationInFrames = segments.reduce((a, s) => a + s.frames, 0);
   const trailer: EditFile["trailer"] = {
@@ -212,7 +235,7 @@ export async function makeTrailer(
   // The edit is saved before rendering, so a failed or restyled render can be redone from it.
   const edit: EditFile = {
     version: EDIT_VERSION,
-    url: capture.finalUrl,
+    url,
     duration: timeline.duration,
     skipped: timeline.skipped,
     trailer,
@@ -239,6 +262,54 @@ export async function makeTrailer(
     plan: shotPlan,
     notes,
   };
+}
+
+/**
+ * A new take of a finished trailer: the edited script, re-voiced (by another narrator, or with
+ * another caption look, if asked), cut over the first take's footage. Nothing is filmed again, so
+ * it takes about a minute; a line longer than its shot holds the shot's last frame.
+ */
+export async function recutTrailer(
+  fromDir: string,
+  jobDir: string,
+  url: string,
+  plan: Plan,
+  options: TrailerOptions,
+  hooks: TrailerHooks = {},
+): Promise<TrailerResult> {
+  const recording = JSON.parse(await readFile(path.join(fromDir, "recording.json"), "utf8")) as Recording;
+  await linkFiles(path.join(fromDir, "frames"), path.join(jobDir, "frames"));
+  await writeFile(path.join(jobDir, "recording.json"), JSON.stringify(recording));
+
+  hooks.onStepStart?.("voice", "The narrator is reading the new script");
+  const voiced = await voiceOrCaptions(plan, options, (d) => hooks.onStepProgress?.("voice", d));
+  hooks.onStepDone?.("voice", voiceDetail(voiced, narratorName(plan, options)));
+
+  hooks.onStepStart?.("record", "Cutting the first take's footage to the new lines");
+  const timeline = buildTimeline(voiced.lines, plan, recording, options.style, options.length, { freeze: true });
+  const filmed = timeline.segments.filter((s) => s.kind === "shot").length;
+  if (filmed === 0) throw new Error("The first take has no footage to recut.");
+  hooks.onStepDone?.("record", `${filmed} shots from the first take, nothing filmed again`);
+
+  return cutAndRender({ jobDir, url, host: hostLabel(url), shotPlan: plan, voiced, recording, timeline, options, filmed, notes: voiceNotes(voiced) }, hooks);
+}
+
+/** Hard-links a folder's files into another (copying any the disk will not link), so a recut
+ *  shares the first take's footage on disk instead of holding a second copy of it. */
+async function linkFiles(from: string, to: string): Promise<void> {
+  await mkdir(to, { recursive: true });
+  for (const name of await readdir(from)) {
+    const source = path.join(from, name);
+    const target = path.join(to, name);
+    await link(source, target).catch(() => copyFile(source, target));
+  }
+}
+
+/** What the screening room should say about the narration, if anything went differently. */
+function voiceNotes(voiced: Voiced): string[] {
+  if (!voiced.narrated) return ["The narrator could not be reached, so this trailer has captions and music only."];
+  if (voiced.backup) return [`The usual narrator could not be reached, so ${voiced.backup}, a backup voice, read this trailer.`];
+  return [];
 }
 
 const narratorName = (plan: Plan, options: TrailerOptions) => NARRATORS[narratorFor(options.voice, plan.mood)].name;

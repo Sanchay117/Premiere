@@ -29,6 +29,11 @@ export const FORMATS: { id: TrailerFormat; name: string; ratio: string; line: st
   { id: "vertical", name: "Tall", ratio: "9:16", line: "TikTok, Reels and Shorts" },
 ];
 
+/** Most words a recut's script may run to at each running time, and most characters in one of
+ *  its lines (the worker checks the same: worker/src/server/recut.ts). */
+export const WORDS_MAX: Record<TrailerLength, number> = { 45: 170, 30: 110, 15: 55 };
+export const LINE_MAX = 240;
+
 /** Narration word targets, the same as the worker's (worker/src/planner/schema.ts). */
 export const WORDS_TARGETS: Record<TrailerStyle, Record<TrailerLength, [number, number]>> = {
   walkthrough: { 45: [100, 125], 30: [60, 80], 15: [26, 38] },

@@ -231,7 +231,7 @@ function ShotScene({ segment, frames, base, boost = 1 }: { segment: TrailerSegme
   const duration = (segment.frames - (segment.punchFrames ?? 0)) / fps;
   const box = segment.box ?? null;
   const actionAt = segment.actionAt ?? 0.7;
-  const file = pickFrame(frames, (segment.footageStart ?? 0) + t);
+  const file = pickFrame(frames, Math.min((segment.footageStart ?? 0) + t, segment.footageEnd ?? Number.POSITIVE_INFINITY));
 
   // Virtual camera: ease toward the target, keep the window inside the frame.
   const zoomTarget = (box ? (box.w < 140 ? 1.5 : box.w < 480 ? 1.32 : box.w < 1000 ? 1.15 : 1.06) : 1.05) * boost;

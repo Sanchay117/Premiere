@@ -92,6 +92,8 @@ export interface TimelineSegment {
     action: Shot["action"];
     /** Recording seconds where this segment's footage starts. */
     footageStart: number;
+    /** Recording seconds where the shot's footage ends; past it the scene holds the last frame. */
+    footageEnd: number;
     /** Seconds after the footage starts when the action happens. */
     actionAt: number;
     box: Box | null;
@@ -128,7 +130,16 @@ export function shotHolds(lines: VoiceLine[], plan: Plan, style: TrailerStyle = 
   });
 }
 
-export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recording, style: TrailerStyle = "walkthrough", length: TrailerLength = 45): Timeline {
+/** freeze: let a shot outlast its footage, holding the last frame, so a recut's longer line still
+ *  plays in full over the first take's footage. */
+export function buildTimeline(
+  lines: VoiceLine[],
+  plan: Plan,
+  recording: Recording,
+  style: TrailerStyle = "walkthrough",
+  length: TrailerLength = 45,
+  { freeze = false }: { freeze?: boolean } = {},
+): Timeline {
   const byKey = new Map(lines.map((l) => [l.key, l]));
   const hook = byKey.get("hook");
   const close = byKey.get("close");
@@ -155,7 +166,7 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
       continue;
     }
     const available = rec.end - rec.start;
-    const footage = Math.min(shotDuration(line, tail), Math.max(SHOT.min, available));
+    const footage = freeze ? shotDuration(line, tail) : Math.min(shotDuration(line, tail), Math.max(SHOT.min, available));
     const actionAt = Math.max(0, rec.actionAt - rec.start);
     segments.push({
       kind: "shot",
@@ -163,7 +174,7 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
       duration: punch + footage,
       voiceAt: t + punch + SHOT.voiceAt,
       line,
-      shot: { index: rec.index, action: shot.action, footageStart: rec.start, actionAt, box: rec.box, punch, title: shot.punch },
+      shot: { index: rec.index, action: shot.action, footageStart: rec.start, footageEnd: rec.end, actionAt, box: rec.box, punch, title: shot.punch },
     });
     if (shot.action === "click" || shot.action === "type") clicks.push(t + punch + actionAt);
     if (punch) hits.push(t);

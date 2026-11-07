@@ -14,6 +14,8 @@ export type TrailerSegment = {
   /** Words relative to the segment start, in seconds. */
   words: CaptionWord[];
   footageStart?: number;
+  /** Recording seconds where the shot's footage ends: a longer recut line holds the last frame. */
+  footageEnd?: number;
   actionAt?: number;
   action?: string;
   box?: Box | null;

@@ -117,3 +117,22 @@ test("each running time lands in its own window", () => {
   const thirty = short(3.2, 4, 30);
   assert.ok(thirty >= 26.5 && thirty <= 31.05, `${thirty}`);
 });
+
+test("a recut line longer than its footage holds the last frame instead of being cut short", () => {
+  const plan = {
+    appName: "App", tagline: "", mood: "calm", hook: "x", close: "x", cta: "Go", publicSafe: true,
+    shots: [{ action: "wait", target: null, text: null, narration: "x", punch: "Go" }],
+  } as Plan;
+  const lines = [voiced("hook", 3), voiced("close", 3), voiced("shot-1", 6)];
+  // Two seconds of footage for a six second line.
+  const recording = {
+    width: 1920, height: 1080, frames: [],
+    shots: [{ index: 0, ok: true, error: null, start: 4, actionAt: 4.7, end: 6, box: null, typed: null, url: "" }],
+  } as Recording;
+  const shotOf = (t: Timeline) => t.segments.find((s) => s.kind === "shot")!;
+  const firstTake = shotOf(buildTimeline(lines, plan, recording, "walkthrough"));
+  const recut = shotOf(buildTimeline(lines, plan, recording, "walkthrough", 45, { freeze: true }));
+  assert.ok(recut.duration > firstTake.duration, `${recut.duration} vs ${firstTake.duration}`);
+  assert.ok(recut.duration >= 6, `${recut.duration}`);
+  assert.equal(recut.shot?.footageEnd, 6);
+});

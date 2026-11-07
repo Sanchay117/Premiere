@@ -71,7 +71,16 @@ export default function JobPage() {
           {job && (
             <div className="mt-6 flex flex-wrap items-center gap-2 text-sm">
               <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim">{host}</span>
-              <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim">{plannerName(job.planner)}</span>
+              {job.recutOf ? (
+                <Link
+                  href={`/jobs/${job.recutOf}`}
+                  className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim transition hover:border-amber hover:text-amber"
+                >
+                  Recut of the first take
+                </Link>
+              ) : (
+                <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim">{plannerName(job.planner)}</span>
+              )}
               {job.options && (
                 <span className="rounded-full border border-line-strong px-3 py-1 font-mono text-xs text-cream-dim">
                   {job.options.style === "hype" ? "Hype cut" : "Walkthrough"} · {job.options.length ?? 45} s{job.options.format === "vertical" ? " vertical" : ""} · {job.result?.trailer?.narrator ?? narratorLabel(job.options.voice)} · {job.options.captions} captions{job.demo ? " · signed-in demo" : ""}

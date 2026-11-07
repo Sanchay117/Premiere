@@ -6,6 +6,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { WORDS_TARGETS } from "@/lib/options";
 import { plannerName, type JobView, type Shot } from "@/lib/types";
 import { Animatic, buildScenes, runtimeOf, type AnimaticHandle } from "./Animatic";
+import { Recut } from "./Recut";
 
 const ACTION_STYLE: Record<Shot["action"], string> = {
   click: "border-amber/50 bg-amber/10 text-amber",
@@ -101,7 +102,7 @@ export function Storyboard({ job }: { job: JobView }) {
   }, [capture]);
 
   const usedFallback = planner.source === "fallback";
-  const writer = usedFallback ? "Free planner" : planner.model ? plannerName(job.planner) : plannerName(job.planner);
+  const writer = job.recutOf ? "Recut by hand" : usedFallback ? "Free planner" : plannerName(job.planner);
   const rows = [
     { kind: "title" as const, text: plan.hook },
     ...plan.shots.map((shot) => ({ kind: "shot" as const, shot, text: shot.narration })),
@@ -125,7 +126,7 @@ export function Storyboard({ job }: { job: JobView }) {
         <Animatic ref={animatic} jobId={job.id} result={result} onScene={onScene} />
         <aside className="h-fit rounded-2xl border border-line bg-ink-2/70 p-6">
           <p className="eyebrow mb-2">The take</p>
-          <Stat label="Script by" value={writer} hint={planner.source === "cache" ? "from cache, $0" : undefined} />
+          <Stat label="Script by" value={writer} hint={job.recutOf ? "over the first take's footage" : planner.source === "cache" ? "from cache, $0" : undefined} />
           <Stat label="Narration" value={`${planner.words} words`} hint={`target ${WORDS_TARGETS[job.options?.style ?? "hype"][job.options?.length ?? 45].join(" to ")}`} />
           <Stat label="Runtime" value={`about ${Math.round(runtime)} s`} />
           <Stat label="Shots" value={String(plan.shots.length)} />
@@ -194,6 +195,7 @@ export function Storyboard({ job }: { job: JobView }) {
         </ol>
       </div>
 
+      {job.status === "done" && result.trailer?.canRecut && <Recut key={job.id} job={job} />}
       <Rerun job={job} />
     </motion.section>
   );

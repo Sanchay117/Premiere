@@ -1,6 +1,7 @@
 // npm run serve (in worker/) or npm run dev (repo root, with the web app).
 // Small HTTP API the web app calls server-side:
-//   POST /jobs                    { url, style?, voice?, captions?, gallery?, code?, fresh? } -> 202 { id }
+//   POST /jobs                    { url, style?, voice?, captions?, length?, format?, notes?, demoUrl?, gallery?, code?, fresh? } -> 202 { id }
+//   POST /jobs/:id/recut          { hook?, shots?: [{ narration?, punch? }], close?, voice?, captions?, code? } -> 202 { id }
 //   GET  /jobs/:id                -> JobView (live, or read back from the job's job.json)
 //   GET  /jobs/:id/files/:name    -> a screenshot, or the trailer, thumbnails and captions once rendered
 //   GET  /gallery                 -> approved trailers whose makers opted in, newest first
@@ -18,12 +19,13 @@ import { pipeline } from "node:stream";
 import path from "node:path";
 import { config } from "../config";
 import { assertPublicUrl, UnsafeUrlError } from "../safety/url-guard";
-import { parseNotes, parseOptions, type TrailerOptions } from "../options";
+import { parseNotes, parseOptions, withDefaults, type TrailerOptions } from "../options";
 import { charge, paymentConfig, paymentsEnabled, pricing } from "../payments";
 import { accessRequired, admit } from "./access";
 import { warmRenderer } from "../render/render";
 import { galleryEntries } from "./gallery";
-import { createJob, findJob, jobFile, toView } from "./jobs";
+import { createJob, createRecut, findJob, jobFile, toView } from "./jobs";
+import { applyRecut } from "./recut";
 
 const PORT = Number(process.env.WORKER_PORT) || 8787;
 const HOST = process.env.WORKER_HOST?.trim() || "127.0.0.1";
@@ -153,6 +155,30 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes, demoUrl: order.demoUrl });
     console.log(`job ${job.id.slice(0, 8)} paid by ${paid.payer}, tx ${paid.transaction}`);
     return send(res, 202, { ...jobLinks(job.id), free: false, transaction: paid.transaction }, paid.headers);
+  }
+
+  // A recut of a finished trailer: edited lines, another narrator or caption look, cut from the
+  // first take's footage without filming again. It is free even once payments are on, and counts
+  // as one of the visitor's trailers for the day.
+  const recutMatch = pathname.match(/^\/jobs\/([0-9a-f-]{36})\/recut$/);
+  if (req.method === "POST" && recutMatch) {
+    const source = await findJob(recutMatch[1]!);
+    if (!source?.result?.trailer || source.status !== "done") return send(res, 404, { error: "That trailer is not ready to recut yet." });
+    const kept = source.result.trailer.canRecut ? await stat(path.join(source.outDir, "recording.json")).catch(() => null) : null;
+    if (!kept) return send(res, 409, { error: "This trailer was made before recuts, so its footage was not kept. Order a new one to recut it." });
+    let body: Record<string, unknown>;
+    try {
+      body = await readJson(req);
+    } catch {
+      return send(res, 400, { error: "Send the edited script as JSON." });
+    }
+    const recut = applyRecut(source.result.plan, withDefaults(source.options), body);
+    if (!recut.ok) return send(res, 400, { error: recut.error });
+    const decision = await admit(typeof body.code === "string" ? body.code.slice(0, 64) : undefined, visitorOf(req));
+    if (!decision.ok) return send(res, 403, { error: decision.reason, needsCode: decision.needsCode ?? false });
+    const job = createRecut(source, recut.plan, recut.options);
+    console.log(`job ${job.id.slice(0, 8)} admitted, a recut of ${source.id.slice(0, 8)}`);
+    return send(res, 202, { id: job.id });
   }
 
   const jobMatch = pathname.match(/^\/jobs\/([0-9a-f-]{36})$/);

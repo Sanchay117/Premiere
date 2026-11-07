@@ -173,7 +173,7 @@ The site is a drive-in theater for apps, open all night (the Vibeathon theme). K
 **What wins judges:**
 - The first paste works. Handle cookie banners, login walls, slow sites and timeouts gracefully, and always return something watchable.
 - Make trailers for other entrants' apps early and show them in the gallery.
-- The submission's demo video is hand made, not a Premiere trailer (decided 7 Nov: Premiere's own cut was not strong enough for this): `demo/` renders a motion graphics trailer and a walkthrough of the real site with Remotion, narrated by Deepgram Aura-2 (Zeus, then Pandora), with a score synthesized in `demo/src/score.ts`. Rebuild steps are in `demo/README.md`; outputs (`premiere-demo.mp4`, both thumbnails) land in `demo/.out`. `demo/src/analyze.ts` measures how far the voice clears the music on every line, since nobody listens to the mix before it ships.
+- The submission's demo video is hand made, not a Premiere trailer (decided 7 Nov: Premiere's own cut was not strong enough for this): `demo/` renders a motion graphics trailer and a walkthrough of the real site with Remotion, narrated by Deepgram Aura-2 (Asteria, then Pandora), with a score synthesized in `demo/src/score.ts`. Rebuild steps are in `demo/README.md`; outputs (`premiere-demo.mp4`, both thumbnails) land in `demo/.out`. `demo/src/analyze.ts` measures how far the voice clears the music on every line, since nobody listens to the mix before it ships.
 - Post finished trailers on X tagging @vibestarterxyz and the builders; share in the Discord.
 - Submit a day early with the Fundable result attached.
 

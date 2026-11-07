@@ -1,6 +1,6 @@
 # The demo video
 
-Premiere's submission video, built in code: a motion graphics trailer, then a narrated walkthrough of the real site. Everything in it is made here. The narration is Deepgram Aura-2 (Zeus for the trailer, Pandora for the walkthrough). The score and sound design are synthesized in `src/score.ts`, so nothing needs a license. The footage is a Playwright recording of an actual order and recut on the running site.
+Premiere's submission video, built in code: a motion graphics trailer, then a narrated walkthrough of the real site. Everything in it is made here. The narration is Deepgram Aura-2 (Asteria for the trailer, Pandora for the walkthrough). The score and sound design are synthesized in `src/score.ts`, so nothing needs a license. The footage is a Playwright recording of an actual order and recut on the running site.
 
 ## Rebuild it
 

@@ -5,6 +5,7 @@
 import { AbsoluteFill, Img, interpolate, Sequence, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { Beam, BigScreen, Cursor, Grain, Leader, Lot, Marquee, NeonWordmark, neonPower, Ripple, Sky, type Rect } from "./art";
 import { C, gothic, mono, sans, screenGlow, seeded, W, H } from "./theme";
+import { wordFrame } from "./timing";
 import type { IntroProps, Word } from "./types";
 
 const CLAMP = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -115,11 +116,14 @@ function Clock({ spin }: { spin: number }) {
   );
 }
 
-function SkipIt() {
+function SkipIt({ trailerLines }: IntroProps) {
   const frame = useCurrentFrame();
+  const skipAt = wordFrame(trailerLines, "t-skip", "skip", 8, 27);
+  const orAt = wordFrame(trailerLines, "t-skip", "or", 8, 58);
+  const makingAt = wordFrame(trailerLines, "t-skip", "making", 8, 78);
   // The clock gathers speed through the scene: a day goes by in four seconds.
   const spin = Math.pow(frame / 120, 2.2) * 24;
-  const second = frame >= 58;
+  const second = frame >= orAt;
   const progress = interpolate(frame, [60, 120], [0.02, 0.05], CLAMP);
   const r = seeded(frame);
   const drift = interpolate(frame, [0, 120], [0, -30], CLAMP);
@@ -134,12 +138,12 @@ function SkipIt() {
           {!second ? (
             <>
               <Slam text="MOST FOUNDERS" at={10} size={180} origin="0% 50%" />
-              <Slam text="SKIP IT." at={27} size={180} color={C.amber} origin="0% 50%" />
+              <Slam text="SKIP IT." at={skipAt} size={180} color={C.amber} origin="0% 50%" />
             </>
           ) : (
             <>
-              <Slam text="OR LOSE A DAY" at={58} size={180} origin="0% 50%" />
-              <Slam text="MAKING ONE." at={78} size={180} color={C.amber} origin="0% 50%" />
+              <Slam text="OR LOSE A DAY" at={orAt} size={180} origin="0% 50%" />
+              <Slam text="MAKING ONE." at={makingAt} size={180} color={C.amber} origin="0% 50%" />
             </>
           )}
         </div>
@@ -421,8 +425,10 @@ function CutsIt({ base, apps, cutWords, cutAt }: IntroProps & { cutWords: Word[]
   );
 }
 
-function AnyApp({ base, apps }: IntroProps) {
+function AnyApp({ base, apps, trailerLines }: IntroProps) {
   const frame = useCurrentFrame();
+  const anyAt = wordFrame(trailerLines, "t-any", "any", 26, 16);
+  const aboutAt = wordFrame(trailerLines, "t-any", "about", 26, 35);
   const cols = 4;
   const rows = 3;
   const gap = 26;
@@ -461,8 +467,8 @@ function AnyApp({ base, apps }: IntroProps) {
         })}
       </AbsoluteFill>
       <AbsoluteFill style={{ background: "radial-gradient(ellipse at center, rgba(6,7,11,0.85) 22%, rgba(6,7,11,0.35) 72%)", alignItems: "center", justifyContent: "center" }}>
-        <Slam text="ANY APP." at={16} size={280} />
-        <Slam text="ABOUT TWO MINUTES." at={35} size={150} color={C.amber} />
+        <Slam text="ANY APP." at={anyAt} size={280} />
+        <Slam text="ABOUT TWO MINUTES." at={aboutAt} size={150} color={C.amber} />
       </AbsoluteFill>
       <AbsoluteFill style={{ background: "#fff8ea", opacity: flash }} />
     </AbsoluteFill>
@@ -503,7 +509,7 @@ export function Intro(props: IntroProps) {
         <EveryApp />
       </Sequence>
       <Sequence from={at(8)} durationInFrames={at(4)}>
-        <SkipIt />
+        <SkipIt {...props} />
       </Sequence>
       <Sequence from={at(12)} durationInFrames={at(4)}>
         <PasteALink />

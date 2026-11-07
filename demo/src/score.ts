@@ -8,6 +8,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeLoudness } from "../../worker/src/audio/ffmpeg";
 import { readWav, writeWav } from "../../worker/src/audio/wav";
+import { wordFrame } from "../remotion/timing";
 import type { DemoProps } from "../remotion/types";
 import { Bus, compress, follow, highPass, limit, midiHz, Noise, pan, pingPong, polyBlep, reverb, saturate, SR, Svf } from "./dsp";
 import { OUT } from "./paths";
@@ -608,7 +609,25 @@ export async function makeSoundtrack(props: DemoProps, outFile: string, cues: Cu
   // Foley for the opening's picture: slams on the words, letters into the marquee, the typewriter,
   // the projector under the film strip, pops as the editing tracks appear, the wall flipping in.
   const frame = (sceneStart: number, f: number) => sceneStart + f / 30;
-  for (const t of [frame(4, 10), frame(4, 33), frame(8, 10), frame(8, 27), frame(8, 58), frame(8, 78), frame(17.5, 0), frame(17.5, 4), frame(18.5, 0), frame(18.5, 4), frame(19.5, 0), frame(21.5, 0), frame(21.5, 7), frame(26, 16), frame(26, 35)]) {
+  // The same word-timed slams as the picture (wordFrame in remotion/Intro.tsx).
+  const said = (key: string, word: string, sceneStart: number, fallback: number) => frame(sceneStart, wordFrame(props.trailerLines, key, word, sceneStart, fallback));
+  for (const t of [
+    frame(4, 10),
+    frame(4, 33),
+    frame(8, 10),
+    said("t-skip", "skip", 8, 27),
+    said("t-skip", "or", 8, 58),
+    said("t-skip", "making", 8, 78),
+    frame(17.5, 0),
+    frame(17.5, 4),
+    frame(18.5, 0),
+    frame(18.5, 4),
+    frame(19.5, 0),
+    frame(21.5, 0),
+    frame(21.5, 7),
+    said("t-any", "any", 26, 16),
+    said("t-any", "about", 26, 35),
+  ]) {
     s.slam(t, 0.55);
   }
   const letters = (sceneStart: number, startFrame: number, text: string) =>

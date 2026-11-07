@@ -1,7 +1,7 @@
 // The demo video's narration. The opening trailer is read by a deep announcer voice and timed to
 // the score's bars; the walkthrough is read by a calmer guide voice, one line per beat of the demo.
 
-export const TRAILER_VOICE = "aura-2-zeus-en";
+export const TRAILER_VOICE = "aura-2-asteria-en";
 export const GUIDE_VOICE = "aura-2-pandora-en";
 
 /** The opening trailer: each line starts at its second in the cut (the score runs at 120 bpm, so

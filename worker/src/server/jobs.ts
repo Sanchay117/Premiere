@@ -186,7 +186,7 @@ function pump(): void {
 async function run(job: Job): Promise<void> {
   job.status = "running";
   touch(job);
-  const { style, voice, captions } = job.options;
+  const { style, voice, captions, length } = job.options;
   console.log(`job ${job.id.slice(0, 8)} ${job.planner} ${style}/${voice}/${captions} ${job.url}`);
   let current: StepKey = "capture";
   try {
@@ -220,7 +220,7 @@ async function run(job: Job): Promise<void> {
     );
     const result = await planTrailer(
       stored,
-      job.planner === "none" ? { planner: "fallback", style } : { planner: "claude", model: MODELS[job.planner], style },
+      job.planner === "none" ? { planner: "fallback", style, length } : { planner: "claude", model: MODELS[job.planner], style, length },
     );
     const attempt = result.attempt;
     const shots = result.plan.shots.length;

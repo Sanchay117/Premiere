@@ -8,11 +8,17 @@ export type TrailerStyle = "hype" | "walkthrough";
 export type CaptionStyle = "karaoke" | "boxed" | "bold" | "off";
 export type Narrator = "atlas" | "zeus" | "asteria" | "thalia" | "ophelia" | "athena" | "draco" | "pandora";
 export type VoiceChoice = "auto" | Narrator;
+export type TrailerLength = 45 | 30 | 15;
+export type TrailerFormat = "landscape" | "vertical";
 
 export interface TrailerOptions {
   style: TrailerStyle;
   voice: VoiceChoice;
   captions: CaptionStyle;
+  /** Missing on jobs made before running times existed: those are 45 seconds. */
+  length?: TrailerLength;
+  /** Missing on jobs made before vertical cuts existed: those are landscape. */
+  format?: TrailerFormat;
 }
 
 export interface Shot {

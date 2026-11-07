@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { aliasOf, config, type Effort, type ModelId } from "../config";
 import type { Capture } from "../capture/types";
-import type { TrailerStyle } from "../options";
+import type { TrailerLength, TrailerStyle } from "../options";
 import { urlSlug } from "../lib/url";
 import { PROMPT_VERSION } from "./prompt";
 import { PlanSchema, type Plan } from "./schema";
@@ -23,10 +23,16 @@ export interface SavedPlan {
 }
 
 const slug = (c: Capture) => urlSlug(new URL(c.url));
-/** One cached plan per URL, model and style, so comparing models never returns another model's
- *  plan and a hype cut never reuses a walkthrough script. */
-const cachePath = (c: Capture, model: ModelId, style: TrailerStyle) =>
-  path.join(config.dataDir, "plans", `${slug(c)}-${aliasOf(model)}-${style}.json`);
+/** What a plan was written for besides the model: the cut's style and running time. */
+export interface PlanVariant {
+  style: TrailerStyle;
+  length?: TrailerLength;
+}
+
+/** One cached plan per URL, model, style and running time, so comparing models never returns
+ *  another model's plan and a 15 second hype cut never reuses a 45 second walkthrough. */
+const cachePath = (c: Capture, model: ModelId, { style, length = 45 }: PlanVariant) =>
+  path.join(config.dataDir, "plans", `${slug(c)}-${aliasOf(model)}-${style}${length === 45 ? "" : `-${length}s`}.json`);
 export const mockPath = (c: Capture) => path.join(config.fixturesDir, "plans", `${slug(c)}.json`);
 
 async function readSaved(file: string): Promise<SavedPlan | null> {
@@ -58,16 +64,16 @@ function toSaved(c: Capture, plan: Plan, meta: Meta): SavedPlan {
   };
 }
 
-/** A cached plan from this model and style, for this exact capture and prompt version. */
-export async function readCachedPlan(c: Capture, model: ModelId, style: TrailerStyle): Promise<SavedPlan | null> {
-  const saved = await readSaved(cachePath(c, model, style));
+/** A cached plan from this model and variant, for this exact capture and prompt version. */
+export async function readCachedPlan(c: Capture, model: ModelId, variant: PlanVariant): Promise<SavedPlan | null> {
+  const saved = await readSaved(cachePath(c, model, variant));
   if (!saved || saved.promptVersion !== PROMPT_VERSION || saved.capturedAt !== c.capturedAt) return null;
   return saved;
 }
 
-export function writeCachedPlan(c: Capture, plan: Plan, meta: Meta & { model: ModelId; style: TrailerStyle }): Promise<string> {
-  const { style, ...rest } = meta;
-  return writeSaved(cachePath(c, meta.model, style), toSaved(c, plan, rest));
+export function writeCachedPlan(c: Capture, plan: Plan, meta: Meta & { model: ModelId } & PlanVariant): Promise<string> {
+  const { style, length, ...rest } = meta;
+  return writeSaved(cachePath(c, meta.model, { style, length }), toSaved(c, plan, rest));
 }
 
 export function readMockPlan(c: Capture): Promise<SavedPlan | null> {

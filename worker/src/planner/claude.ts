@@ -8,7 +8,7 @@ import type { StoredCapture } from "../capture/types";
 import type { SpendLedger } from "./budget";
 import { PLAN_JSON_SCHEMA } from "./json-schema";
 import { responseCostUsd, worstCaseUsd, type TokenUsage } from "./pricing";
-import type { TrailerStyle } from "../options";
+import type { TrailerLength, TrailerStyle } from "../options";
 import { buildUserContent, systemPrompt } from "./prompt";
 import { PlanSchema, type Plan } from "./schema";
 
@@ -72,7 +72,7 @@ function apiErrorDetail(err: InstanceType<typeof Anthropic.APIError>): string {
 
 export async function planWithClaude(
   stored: StoredCapture,
-  { model, effort, ledger, style }: { model: ModelId; effort: Effort; ledger: SpendLedger; style: TrailerStyle },
+  { model, effort, ledger, style, length = 45 }: { model: ModelId; effort: Effort; ledger: SpendLedger; style: TrailerStyle; length?: TrailerLength },
 ): Promise<ClaudeAttempt> {
   const base: ClaudeAttempt = {
     model,
@@ -107,7 +107,7 @@ export async function planWithClaude(
     response = await getClient(config.apiKey).beta.messages.create({
       model,
       max_tokens: MAX_TOKENS,
-      system: systemPrompt(style),
+      system: systemPrompt(style, length),
       messages: [{ role: "user", content: await buildUserContent(stored) }],
       output_config: { effort, format: { type: "json_schema", schema: PLAN_JSON_SCHEMA } },
       ...(serverFallback ? { betas: [SERVER_FALLBACK_BETA], fallbacks: "default" as const } : {}),

@@ -5,8 +5,8 @@
 // caption looks.
 
 import { useEffect, useRef, useState } from "react";
-import { CAPTIONS, NARRATORS, STYLES } from "@/lib/options";
-import type { CaptionStyle, TrailerStyle, VoiceChoice } from "@/lib/types";
+import { CAPTIONS, LENGTHS, NARRATORS, STYLES } from "@/lib/options";
+import type { CaptionStyle, TrailerLength, TrailerStyle, VoiceChoice } from "@/lib/types";
 
 export function FormLabel({ children }: { children: React.ReactNode }) {
   return <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-paper-dim">{children}</span>;
@@ -47,6 +47,38 @@ export function StylePicker({ value, onChange }: { value: TrailerStyle; onChange
                 {s.name.toUpperCase()}
               </span>
               <span className="mt-1.5 block text-[13px] leading-snug text-paper-dim">{s.line}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+export function LengthPicker({ value, onChange }: { value: TrailerLength; onChange: (v: TrailerLength) => void }) {
+  return (
+    <fieldset>
+      <legend>
+        <FormLabel>The running time</FormLabel>
+      </legend>
+      <div className="mt-2 grid grid-cols-3 gap-2.5">
+        {LENGTHS.map((l) => {
+          const on = l.id === value;
+          return (
+            <label
+              key={l.id}
+              className={`cursor-pointer border-2 px-3 py-2 transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ticket ${
+                on ? "border-ticket bg-ticket/[0.06]" : "border-paper-ink/20 hover:border-paper-ink/50"
+              }`}
+            >
+              <input type="radio" name="length" value={l.id} checked={on} onChange={() => onChange(l.id)} className="sr-only" />
+              <span className="flex items-center gap-2 font-display text-[1.55rem] leading-none tracking-wide">
+                <TickBox on={on} />
+                {l.id} S
+              </span>
+              <span className="mt-1 block text-[12px] leading-snug text-paper-dim">
+                <span className="font-semibold text-paper-ink">{l.name}.</span> {l.line}
+              </span>
             </label>
           );
         })}

@@ -28,6 +28,8 @@ const { values, positionals } = parseArgs({
     fresh: { type: "boolean", default: false },
     recapture: { type: "boolean", default: false },
     rerender: { type: "string" },
+    length: { type: "string" },
+    format: { type: "string" },
     thumbnails: { type: "boolean", default: false },
   },
 });
@@ -61,8 +63,8 @@ try {
     const planned = await planTrailer(
       stored,
       choice === "none"
-        ? { planner: "fallback", style: options.style }
-        : { planner: "claude", model: MODELS[choice] ?? config.model, fresh: values.fresh, style: options.style },
+        ? { planner: "fallback", style: options.style, length: options.length }
+        : { planner: "claude", model: MODELS[choice] ?? config.model, fresh: values.fresh, style: options.style, length: options.length },
     );
     console.log(`Plan: ${planned.source}, ${planned.plan.shots.length} shots, ${planned.words} words (${options.style})`);
 

@@ -3,16 +3,18 @@
 
 import type { Capture, CapturedElement } from "../capture/types";
 import { asSentence, sanitizeScript, truncateWords } from "../lib/text";
-import { DEFAULT_OPTIONS, type TrailerStyle } from "../options";
+import { DEFAULT_OPTIONS, type TrailerLength, type TrailerStyle } from "../options";
 import { appNameFrom, DESTRUCTIVE_TEXT, LOGIN_TEXT } from "./fallback";
-import { planWords, WORDS_TARGET, type Plan, type PlanInput, type Shot } from "./schema";
+import { planWords, wordsTarget, type Plan, type PlanInput, type Shot } from "./schema";
 
-const MIN_SHOTS = 3;
-const MAX_SHOTS = 10;
+/** Fewest and most shots a plan may have at each running time. */
+const SHOT_LIMITS: Record<TrailerLength, { min: number; max: number }> = { 45: { min: 3, max: 10 }, 30: { min: 2, max: 5 }, 15: { min: 1, max: 3 } };
 /** Outside this range the trailer would be badly short or long, so the plan is rejected. The floor
  *  sits well under every style's target (hype aims for 55 to 85 words): a floor of 60 once threw
  *  away good 55 to 59 word hype scripts without saying why. */
 export const WORDS_HARD = { min: 40, max: 170 };
+/** The same bounds for the shorter cuts. */
+export const WORDS_HARD_BY_LENGTH: Record<TrailerLength, { min: number; max: number }> = { 45: WORDS_HARD, 30: { min: 25, max: 110 }, 15: { min: 12, max: 55 } };
 
 export interface Validation {
   plan: Plan;
@@ -38,7 +40,9 @@ function cleanPunch(text: string | null | undefined): string {
   return short.length <= 32 ? short : truncateWords(short, 3).slice(0, 32).trim();
 }
 
-export function validatePlan(raw: PlanInput, capture: Capture, style: TrailerStyle = DEFAULT_OPTIONS.style): Validation {
+export function validatePlan(raw: PlanInput, capture: Capture, style: TrailerStyle = DEFAULT_OPTIONS.style, length: TrailerLength = 45): Validation {
+  const { min: minShots, max: maxShots } = SHOT_LIMITS[length];
+  const hard = WORDS_HARD_BY_LENGTH[length];
   const issues: string[] = [];
   const elements = new Map(capture.elements.map((e) => [e.id, e]));
   const sections = new Set(capture.sections.map((s) => s.id));
@@ -108,9 +112,9 @@ export function validatePlan(raw: PlanInput, capture: Capture, style: TrailerSty
     shots.push(shot);
   });
 
-  if (shots.length > MAX_SHOTS) {
-    issues.push(`${shots.length} shots, kept the first ${MAX_SHOTS}`);
-    shots.length = MAX_SHOTS;
+  if (shots.length > maxShots) {
+    issues.push(`${shots.length} shots, kept the first ${maxShots}`);
+    shots.length = maxShots;
   }
 
   const plan: Plan = {
@@ -128,15 +132,15 @@ export function validatePlan(raw: PlanInput, capture: Capture, style: TrailerSty
   const words = planWords(plan);
   if (!plan.hook) issues.push("missing hook");
   if (!plan.close) issues.push("missing close");
-  if (shots.length < MIN_SHOTS) issues.push(`only ${shots.length} usable shots`);
-  const target = WORDS_TARGET[style];
-  if (words < WORDS_HARD.min || words > WORDS_HARD.max) {
-    issues.push(`${words} narration words, outside the ${WORDS_HARD.min} to ${WORDS_HARD.max} a trailer needs`);
+  if (shots.length < minShots) issues.push(`only ${shots.length} usable shots`);
+  const target = wordsTarget(style, length);
+  if (words < hard.min || words > hard.max) {
+    issues.push(`${words} narration words, outside the ${hard.min} to ${hard.max} a ${length} second trailer needs`);
   } else if (words < target.min || words > target.max) {
     issues.push(`${words} narration words (target ${target.min} to ${target.max})`);
   }
   const usable =
-    shots.length >= MIN_SHOTS && words >= WORDS_HARD.min && words <= WORDS_HARD.max && !!plan.hook && !!plan.close;
+    shots.length >= minShots && words >= hard.min && words <= hard.max && !!plan.hook && !!plan.close;
 
   return { plan, issues, droppedShots: raw.shots.length - shots.length, words, usable };
 }

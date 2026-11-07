@@ -49,6 +49,6 @@ export function visitorId(request: Request): string {
 /** The order fields the worker accepts, copied from a request body. */
 export function orderFields(body: unknown): Record<string, unknown> {
   const raw = (body ?? {}) as Record<string, unknown>;
-  const keys = ["url", "fresh", "code", "style", "voice", "captions", "gallery"];
+  const keys = ["url", "fresh", "code", "style", "voice", "captions", "length", "format", "notes", "demoUrl", "gallery"];
   return Object.fromEntries(keys.filter((k) => raw[k] !== undefined).map((k) => [k, raw[k]]));
 }

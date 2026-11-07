@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EM_DASH } from "../lib/text";
-import { WORDS_TARGET, type PlanInput as Plan } from "./schema";
+import { WORDS_TARGET, WORDS_TARGETS, type PlanInput as Plan } from "./schema";
 import { testCapture } from "./test-capture";
-import { validatePlan, WORDS_HARD } from "./validate";
+import { validatePlan, WORDS_HARD, WORDS_HARD_BY_LENGTH } from "./validate";
 
 const narration = "This line has exactly thirteen words so the totals stay easy to check.";
 
@@ -113,7 +113,7 @@ test("every style's word target clears the hard floor, and a rejection says why"
   assert.equal(hype.words, 6 * 7 + 6 + 8);
   assert.equal(hype.usable, true);
   const short = validatePlan(plan([{ action: "scroll", target: null, text: null, narration: "Short." }]), testCapture());
-  assert.ok(short.issues.some((issue) => issue.includes("a trailer needs")), short.issues.join("; "));
+  assert.ok(short.issues.some((issue) => issue.includes("trailer needs")), short.issues.join("; "));
 });
 
 test("accepts a full plan near the word target", () => {
@@ -123,4 +123,27 @@ test("accepts a full plan near the word target", () => {
   );
   assert.equal(v.usable, true);
   assert.equal(v.words, 7 * 13 + 10 + 10);
+});
+
+test("shorter cuts have their own targets, each above its floor, and a short plan passes only at its length", () => {
+  for (const [style, byLength] of Object.entries(WORDS_TARGETS)) {
+    for (const [length, target] of Object.entries(byLength)) {
+      const floor = WORDS_HARD_BY_LENGTH[Number(length) as 15 | 30 | 45].min;
+      assert.ok(target.min > floor, `${style} ${length}s target starts at ${target.min}, under the floor of ${floor}`);
+    }
+  }
+  // Two shots and 20 words: a fine 15 second hype cut, but not a 45 second trailer.
+  const tiny = {
+    ...plan([
+      { action: "scroll" as const, target: null, text: null, narration: "One link in, one trailer out." },
+      { action: "scroll" as const, target: null, text: null, narration: "Real footage, scored and captioned." },
+    ]),
+    hook: "Your app needs a trailer.",
+    close: "Make yours tonight.",
+  };
+  assert.equal(validatePlan(tiny, testCapture(), "hype", 15).usable, true);
+  assert.equal(validatePlan(tiny, testCapture(), "hype", 45).usable, false);
+  // A 15 second cut keeps at most three shots.
+  const many = plan(Array.from({ length: 6 }, () => ({ action: "scroll" as const, target: null, text: null, narration: "Four words right here." })));
+  assert.equal(validatePlan(many, testCapture(), "hype", 15).plan.shots.length, 3);
 });

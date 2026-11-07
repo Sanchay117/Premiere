@@ -7,13 +7,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { DEFAULT_OPTIONS, FREE_UNTIL_LABEL } from "@/lib/options";
-import type { CaptionStyle, Pricing, TrailerStyle, VoiceChoice } from "@/lib/types";
+import type { CaptionStyle, Pricing, TrailerLength, TrailerStyle, VoiceChoice } from "@/lib/types";
 import { LetterboxClose } from "./Letterbox";
-import { CaptionPicker, FormLabel, NarratorDial, StylePicker } from "./pickers";
+import { CaptionPicker, FormLabel, LengthPicker, NarratorDial, StylePicker } from "./pickers";
 
 export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrlChange: (url: string) => void }) {
   const router = useRouter();
   const [style, setStyle] = useState<TrailerStyle>(DEFAULT_OPTIONS.style);
+  const [length, setLength] = useState<TrailerLength>(DEFAULT_OPTIONS.length);
   const [voice, setVoice] = useState<VoiceChoice>(DEFAULT_OPTIONS.voice);
   const [captions, setCaptions] = useState<CaptionStyle>(DEFAULT_OPTIONS.captions);
   const [gallery, setGallery] = useState(true);
@@ -42,7 +43,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
       return;
     }
     setState("sending");
-    const order = { url, style, voice, captions, gallery, code: code.trim() || undefined };
+    const order = { url, style, length, voice, captions, gallery, code: code.trim() || undefined };
     let id: string | undefined;
     try {
       if (paid && pricing) {
@@ -132,6 +133,7 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
         </div>
 
         <StylePicker value={style} onChange={setStyle} />
+        <LengthPicker value={length} onChange={setLength} />
         <NarratorDial value={voice} onChange={setVoice} />
         <CaptionPicker value={captions} onChange={setCaptions} />
 

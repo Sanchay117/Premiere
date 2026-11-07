@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { appNameFrom, fallbackPlan, primaryCta } from "./fallback";
-import { planWords, WORDS_TARGET } from "./schema";
+import { planWords, WORDS_TARGET, WORDS_TARGETS } from "./schema";
 import { testCapture } from "./test-capture";
 import { validatePlan } from "./validate";
 
@@ -29,4 +29,13 @@ test("fallback still plans a bare page with no elements or sections", () => {
   const plan = fallbackPlan(capture);
   assert.ok(plan.shots.length >= 3);
   assert.ok(plan.shots.every((s) => s.target === null));
+});
+
+test("the no-AI tour keeps a short cut short", () => {
+  const capture = testCapture();
+  for (const [length, most] of [[15, 2], [30, 3]] as const) {
+    const plan = fallbackPlan(capture, length);
+    assert.ok(plan.shots.length <= most, `${length}s kept ${plan.shots.length} shots`);
+    assert.ok(planWords(plan) <= WORDS_TARGETS.walkthrough[length].max + 10, `${length}s has ${planWords(plan)} words`);
+  }
 });

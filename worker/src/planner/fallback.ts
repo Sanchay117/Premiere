@@ -6,7 +6,8 @@
 import type { Capture, CapturedElement } from "../capture/types";
 import { asSentence, countWords, sanitizeScript, splitSentences } from "../lib/text";
 import { hostLabel } from "../lib/url";
-import { planWords, WORDS_TARGET, type Plan, type Shot } from "./schema";
+import type { TrailerLength } from "../options";
+import { planWords, wordsTarget, type Plan, type Shot } from "./schema";
 
 const ch = (code: number) => String.fromCharCode(code);
 /** " | ", " - ", en dash, em dash, " : ", middle dot or bullet between words of a page title. */
@@ -109,10 +110,10 @@ export function primaryCta(c: Capture): CapturedElement | null {
 }
 
 /** Pads a thin script with leftover page copy, or trims a long one, toward the word target. */
-function fitWords(plan: Plan, extra: string[]): void {
+function fitWords(plan: Plan, extra: string[], target: { min: number; max: number }): void {
   let words = planWords(plan);
   for (const shot of plan.shots) {
-    if (words >= WORDS_TARGET.walkthrough.min) break;
+    if (words >= target.min) break;
     const room = MAX_LINE_WORDS - countWords(shot.narration);
     if (room < 5) continue;
     const next = extra.shift();
@@ -120,16 +121,19 @@ function fitWords(plan: Plan, extra: string[]): void {
     shot.narration = `${shot.narration} ${line(next, room)}`;
     words = planWords(plan);
   }
-  while (words > WORDS_TARGET.walkthrough.max) {
+  while (words > target.max) {
     const longest = plan.shots.reduce((a, b) => (countWords(b.narration) > countWords(a.narration) ? b : a));
     const n = countWords(longest.narration);
-    if (n <= 8) break;
+    if (n <= 6) break;
     longest.narration = line(longest.narration, n - 3);
     words = planWords(plan);
   }
 }
 
-export function fallbackPlan(c: Capture): Plan {
+/** Shots a no-AI tour keeps at each running time: the hero, the call to action, then the tour. */
+const FALLBACK_SHOTS: Record<TrailerLength, number> = { 45: 6, 30: 3, 15: 2 };
+
+export function fallbackPlan(c: Capture, length: TrailerLength = 45): Plan {
   const name = appNameFrom(c);
   const hero = c.sections.find((s) => s.level === 1);
   const cta = primaryCta(c);
@@ -204,12 +208,12 @@ export function fallbackPlan(c: Capture): Plan {
     tagline,
     mood: "energetic",
     hook: asSentence(tagline ? `Meet ${name}. ${asSentence(tagline)}` : `Meet ${name}`),
-    shots,
+    shots: shots.slice(0, FALLBACK_SHOTS[length]),
     close: asSentence(`Try ${name} today at ${hostLabel(c.finalUrl)}`),
     cta: "Try it now",
     // Nothing looked at the page, so a person decides whether it reaches the gallery.
     publicSafe: false,
   };
-  fitWords(plan, material);
+  fitWords(plan, material, wordsTarget("walkthrough", length));
   return plan;
 }

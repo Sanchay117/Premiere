@@ -2,7 +2,7 @@
 // that was filmed, and an end card. Durations follow the voice, so the cut never outruns or
 // trails the narrator. Also builds the caption words and the SRT file.
 
-import type { TrailerStyle } from "../options";
+import type { TrailerLength, TrailerStyle } from "../options";
 import type { Plan, Shot } from "../planner/schema";
 import type { Recording } from "../record/recorder";
 import type { VoiceLine } from "../voice/deepgram";
@@ -22,12 +22,15 @@ const END: Card = { voiceAt: 0.45, tail: 1.6, min: 3.8 };
 const HYPE_TAIL = 0.4;
 /** The most a long hype cut may eat into the pause after each line (0.45 s down to 0.2 s). */
 const HYPE_TAIL_MIN = -0.25;
-/** A hype cut that would run longer than this trims its punch titles and beats evenly. */
-const HYPE_TARGET = 46;
-/** A cut that would come in shorter than this lingers longer after each line, so a lean script
- *  still makes a trailer of about the promised length (Opus at low effort tends to write a
- *  walkthrough of 90 words, a 33 second cut, when asked for 110). */
-const SHORT_TARGET = 41;
+/** Where each running time should land. A hype cut that would run past the ceiling trims its
+ *  punch titles and beats evenly; a cut that would come in under the floor lingers longer after
+ *  each line, so a lean script still makes a trailer of about the promised length (Opus at low
+ *  effort tended to write a 90 word walkthrough, a 33 second cut, when asked for 110). */
+const RUNTIME: Record<TrailerLength, { floor: number; ceiling: number }> = {
+  45: { floor: 41, ceiling: 46 },
+  30: { floor: 27, ceiling: 31 },
+  15: { floor: 13, ceiling: 16 },
+};
 /** The most a short cut adds after each line: a calm tour can rest on a result, a hype cut only
  *  briefly before the next title slams in. */
 const STRETCH_MAX: Record<TrailerStyle, number> = { walkthrough: 1.6, hype: 0.7 };
@@ -47,7 +50,8 @@ const cardDuration = (card: Card, line: VoiceLine | undefined) => Math.max(card.
  * neither. Either cut that would come in under 41 seconds holds each shot a little longer after
  * its line instead. The recorder and the edit both use this, so footage and cut always agree.
  */
-export function pacing(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough"): Pacing {
+export function pacing(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough", length: TrailerLength = 45): Pacing {
+  const { floor, ceiling } = RUNTIME[length];
   const byKey = new Map(lines.map((l) => [l.key, l]));
   const total = (punch: number, tail: number) =>
     cardDuration(TITLE, byKey.get("hook")) +
@@ -59,12 +63,12 @@ export function pacing(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "wa
   const base: Pacing = style === "hype" ? { punch: PUNCH, tail: HYPE_TAIL } : { punch: 0, tail: 0 };
   const full = total(base.punch, base.tail);
   const voicedShots = plan.shots.filter((_, i) => byKey.has(`shot-${i + 1}`)).length;
-  if (full < SHORT_TARGET && voicedShots > 0) {
-    return { punch: base.punch, tail: base.tail + Math.min(STRETCH_MAX[style], (SHORT_TARGET - full) / voicedShots) };
+  if (full < floor && voicedShots > 0) {
+    return { punch: base.punch, tail: base.tail + Math.min(STRETCH_MAX[style], (floor - full) / voicedShots) };
   }
-  if (style !== "hype" || full <= HYPE_TARGET) return base;
+  if (style !== "hype" || full <= ceiling) return base;
   const tight = total(PUNCH_MIN, HYPE_TAIL_MIN);
-  const k = tight >= HYPE_TARGET ? 1 : (full - HYPE_TARGET) / (full - tight);
+  const k = tight >= ceiling ? 1 : (full - ceiling) / (full - tight);
   return { punch: PUNCH - (PUNCH - PUNCH_MIN) * k, tail: HYPE_TAIL - (HYPE_TAIL - HYPE_TAIL_MIN) * k };
 }
 
@@ -116,15 +120,15 @@ export function shotDuration(line: VoiceLine, tail = 0): number {
 }
 
 /** Seconds of footage the recorder should film for each shot. */
-export function shotHolds(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough"): number[] {
-  const { tail } = pacing(lines, plan, style);
+export function shotHolds(lines: VoiceLine[], plan: Plan, style: TrailerStyle = "walkthrough", length: TrailerLength = 45): number[] {
+  const { tail } = pacing(lines, plan, style, length);
   return plan.shots.map((_, i) => {
     const line = lines.find((l) => l.key === `shot-${i + 1}`);
     return (line ? shotDuration(line, tail) : SHOT.min) + 0.35;
   });
 }
 
-export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recording, style: TrailerStyle = "walkthrough"): Timeline {
+export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recording, style: TrailerStyle = "walkthrough", length: TrailerLength = 45): Timeline {
   const byKey = new Map(lines.map((l) => [l.key, l]));
   const hook = byKey.get("hook");
   const close = byKey.get("close");
@@ -134,7 +138,7 @@ export function buildTimeline(lines: VoiceLine[], plan: Plan, recording: Recordi
   const skipped: Timeline["skipped"] = [];
   const clicks: number[] = [];
   const hits: number[] = [];
-  const { punch, tail } = pacing(lines, plan, style);
+  const { punch, tail } = pacing(lines, plan, style, length);
   let t = 0;
 
   const titleDuration = cardDuration(TITLE, hook);

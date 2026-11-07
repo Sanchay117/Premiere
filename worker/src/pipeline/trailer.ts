@@ -139,10 +139,10 @@ export async function makeTrailer(
   const onRecordProgress = (d: string) => hooks.onStepProgress?.("record", d);
   const waitForTurn = () => onRecordProgress("Waiting for another shoot to finish");
   let recording = await inFilmingSlot(
-    () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style), outDir: jobDir, onProgress: onRecordProgress, stage }),
+    () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style, options.length), outDir: jobDir, onProgress: onRecordProgress, stage }),
     waitForTurn,
   );
-  let timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style);
+  let timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style, options.length);
   let filmed = timeline.segments.filter((s) => s.kind === "shot").length;
   if (filmed === 0) {
     // None of the planned shots worked, usually because the page changed after it was mapped. A
@@ -150,13 +150,13 @@ export async function makeTrailer(
     // almost never fails, so the person still gets a trailer of their app. The plan's name,
     // tagline, hook, close and gallery judgment describe the page, not the shots, so they stay.
     onRecordProgress("None of the planned shots worked; filming a simpler tour of the page");
-    shotPlan = { ...plan, shots: validatePlan(fallbackPlan(capture), capture, options.style).plan.shots };
+    shotPlan = { ...plan, shots: validatePlan(fallbackPlan(capture, options.length), capture, options.style, options.length).plan.shots };
     voiced = voiced.narrated ? await voiceOrCaptions(shotPlan, options, onRecordProgress) : { lines: silentLines(shotPlan), narrated: false };
     recording = await inFilmingSlot(
-      () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style), outDir: jobDir, onProgress: onRecordProgress }),
+      () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style, options.length), outDir: jobDir, onProgress: onRecordProgress }),
       waitForTurn,
     );
-    timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style);
+    timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style, options.length);
     filmed = timeline.segments.filter((s) => s.kind === "shot").length;
     notes.push("None of the planned shots could be filmed, so this is a simpler tour of the page.");
   }

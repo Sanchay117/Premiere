@@ -10,6 +10,14 @@ export type TrailerStyle = (typeof TRAILER_STYLES)[number];
 export const CAPTION_STYLES = ["karaoke", "boxed", "bold", "off"] as const;
 export type CaptionStyle = (typeof CAPTION_STYLES)[number];
 
+/** Running time in seconds: the full trailer, and shorter cuts for ads and social posts. */
+export const TRAILER_LENGTHS = [45, 30, 15] as const;
+export type TrailerLength = (typeof TRAILER_LENGTHS)[number];
+
+/** Landscape for YouTube, X and raise pages; vertical for TikTok, Reels and Shorts. */
+export const TRAILER_FORMATS = ["landscape", "vertical"] as const;
+export type TrailerFormat = (typeof TRAILER_FORMATS)[number];
+
 /** A curated set of Deepgram Aura-2 voices that suit trailers. */
 export const NARRATORS = {
   atlas: { model: "aura-2-atlas-en", name: "Atlas", note: "Warm, confident announcer" },
@@ -36,9 +44,11 @@ export interface TrailerOptions {
   style: TrailerStyle;
   voice: VoiceChoice;
   captions: CaptionStyle;
+  length: TrailerLength;
+  format: TrailerFormat;
 }
 
-export const DEFAULT_OPTIONS: TrailerOptions = { style: "hype", voice: "auto", captions: "karaoke" };
+export const DEFAULT_OPTIONS: TrailerOptions = { style: "hype", voice: "auto", captions: "karaoke", length: 45, format: "landscape" };
 
 const pick = <T extends string>(list: readonly T[], value: unknown, fallback: T): T =>
   typeof value === "string" && (list as readonly string[]).includes(value) ? (value as T) : fallback;
@@ -46,12 +56,18 @@ const pick = <T extends string>(list: readonly T[], value: unknown, fallback: T)
 export function parseOptions(input: unknown): TrailerOptions {
   const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const voices = ["auto", ...Object.keys(NARRATORS)] as VoiceChoice[];
+  const length = Number(raw.length);
   return {
     style: pick(TRAILER_STYLES, raw.style, DEFAULT_OPTIONS.style),
     voice: pick(voices, raw.voice, DEFAULT_OPTIONS.voice),
     captions: pick(CAPTION_STYLES, raw.captions, DEFAULT_OPTIONS.captions),
+    length: (TRAILER_LENGTHS as readonly number[]).includes(length) ? (length as TrailerLength) : DEFAULT_OPTIONS.length,
+    format: pick(TRAILER_FORMATS, raw.format, DEFAULT_OPTIONS.format),
   };
 }
+
+/** Options saved before lengths and formats existed get the defaults. */
+export const withDefaults = (options: Partial<TrailerOptions> | undefined): TrailerOptions => ({ ...DEFAULT_OPTIONS, ...options });
 
 /** The narrator a job ends up with: the person's pick, or one that suits the plan's mood. */
 export function narratorFor(voice: VoiceChoice, mood: Plan["mood"]): Narrator {

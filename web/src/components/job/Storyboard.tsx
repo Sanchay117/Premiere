@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { WORDS_TARGETS } from "@/lib/options";
 import { plannerName, type JobView, type Shot } from "@/lib/types";
 import { Animatic, buildScenes, runtimeOf, type AnimaticHandle } from "./Animatic";
 
@@ -120,7 +121,7 @@ export function Storyboard({ job }: { job: JobView }) {
         <aside className="h-fit rounded-2xl border border-line bg-ink-2/70 p-6">
           <p className="eyebrow mb-2">The take</p>
           <Stat label="Script by" value={writer} hint={planner.source === "cache" ? "from cache, $0" : undefined} />
-          <Stat label="Narration" value={`${planner.words} words`} hint={job.options?.style === "hype" ? "target 55 to 85" : "target 95 to 125"} />
+          <Stat label="Narration" value={`${planner.words} words`} hint={`target ${WORDS_TARGETS[job.options?.style ?? "hype"][job.options?.length ?? 45].join(" to ")}`} />
           <Stat label="Runtime" value={`about ${Math.round(runtime)} s`} />
           <Stat label="Shots" value={String(plan.shots.length)} />
           <Stat label="Mood" value={plan.mood} />

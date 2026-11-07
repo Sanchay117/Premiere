@@ -97,3 +97,23 @@ test("a short hype cut adds at most 0.7 s after each line, then stays short", ()
 test("a walkthrough that already fits is left alone", () => {
   assert.deepEqual(cut("walkthrough", 5, 6).pacing, { punch: 0, tail: 0 });
 });
+
+test("each running time lands in its own window", () => {
+  // Two 2.2 s lines in a 15 second hype cut: stretched toward 13 s, never past 16.
+  const short = (seconds: number, shots: number, length: 15 | 30) => {
+    const plan = {
+      appName: "App", tagline: "", mood: "energetic", hook: "x", close: "x", cta: "Go", publicSafe: true,
+      shots: Array.from({ length: shots }, () => ({ action: "wait", target: null, text: null, narration: "x", punch: "Go" })),
+    } as Plan;
+    const lines = [voiced("hook", 1.5), voiced("close", 1.5), ...plan.shots.map((_, i) => voiced(`shot-${i + 1}`, seconds))];
+    const recording = {
+      width: 1920, height: 1080, frames: [],
+      shots: plan.shots.map((_, i) => ({ index: i, ok: true, error: null, start: i * 10, actionAt: i * 10 + 0.7, end: i * 10 + 10, box: null, typed: null, url: "" })),
+    } as Recording;
+    return buildTimeline(lines, plan, recording, "hype", length).duration;
+  };
+  const fifteen = short(2.2, 2, 15);
+  assert.ok(fifteen >= 12.5 && fifteen <= 16, `${fifteen}`);
+  const thirty = short(3.2, 4, 30);
+  assert.ok(thirty >= 26.5 && thirty <= 31.05, `${thirty}`);
+});

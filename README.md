@@ -2,7 +2,7 @@
 
 **Paste a URL, get a launch trailer.**
 
-Premiere opens your app in a real browser, works out what it does, writes a script, clicks through the main flow while it films, and hands back a narrated trailer of about 45 seconds with captions, music and thumbnails. It takes about two and a half minutes. Nobody records anything and nobody edits anything.
+Premiere opens your app in a real browser, works out what it does, writes a script, clicks through the main flow while it films, and hands back a narrated trailer of about 45 seconds (or a 30 or 15 second cut, wide or vertical) with captions, music and thumbnails. It takes about two and a half minutes. Nobody records anything and nobody edits anything.
 
 Every vibecoded app needs a demo video: for the launch post, the hackathon entry, the raise page. Most founders skip it or lose a day making one. Premiere makes it from the link alone.
 
@@ -14,7 +14,7 @@ Built in a week for Vibestarter's Vibeathon 02 (Night shift).
 
 | File | What it is |
 | --- | --- |
-| `trailer.mp4` | 1920×1080, about 45 seconds, H.264 and AAC, captions burned in, sound mastered to -16 LUFS |
+| `trailer.mp4` | 1920×1080 (or 1080×1920 vertical), about 45, 30 or 15 seconds, H.264 and AAC, captions burned in, sound mastered to -16 LUFS |
 | `thumbnail-1920.png`, `thumbnail-1280.png` | Posters for YouTube, X, Discord and raise pages, showing your app in your app's own color |
 | `captions.srt` | Word-timed subtitles |
 
@@ -23,6 +23,12 @@ Each order picks:
 - **The cut.** `hype`: punch titles and footage on a floating screen. `walkthrough`: a calm, full-frame tour.
 - **The narrator.** One of eight voices, or `auto` to match the app's mood.
 - **The captions.** `karaoke`, `boxed`, `bold` or `off`. The SRT ships either way.
+- **The running time.** 45 seconds for the full trailer, or a 30 or 15 second cut for ads and social posts.
+- **The screen.** Wide 16:9 for YouTube, X and raise pages, or tall 9:16 for TikTok, Reels and Shorts.
+- **Director's notes** (optional). One line on what to show, click or type, such as "type a prompt, then click Generate".
+- **A demo link** (optional). For apps behind a login: a link that opens the app signed in to a demo account. Premiere films what is behind the login, never stores the link, and keeps that trailer out of the gallery.
+
+Then, in the screening room, **recut it**: change any line, the narrator or the captions, and Premiere records the new lines and cuts them over the same footage in about a minute, without filming again.
 
 Trailers are free until 16 Nov 2026, within daily limits. After that a trailer costs a few USDC on Base, paid from your wallet.
 
@@ -30,12 +36,12 @@ Trailers are free until 16 Nov 2026, within daily limits. After that a trailer c
 
 One job runs six steps, and Claude is called exactly once.
 
-1. **Capture.** A locked-down Playwright browser opens the URL at 1920×1080, clears cookie banners, waits for the app to finish drawing, and maps every button, link and section, with screenshots. It never signs in: behind a login wall it stays on the public pages. A site that answers with a bot check gets a clear refusal rather than a trailer of the check.
-2. **Script.** One call to Claude Opus 5.5 reads the screenshots and the page map and returns a shot list as structured JSON: what to click, hover, type or scroll to, one line of narration per shot, a punch title for each, and a judgment on whether the page is fit for the public gallery. There is no agent loop. The plan is validated (unknown elements, external links, destructive clicks and typing into sensitive fields are dropped), and if Claude is unavailable or over budget, a planner with no AI writes the script from the page's own words.
-3. **Voice.** Deepgram Aura-2 reads each line, and Deepgram nova-3 transcribes it back so every word gets a timestamp for the captions. The browser for the shoot is already opening the app meanwhile. If the voice service is down, the trailer still ships, with captions and music.
-4. **Shoot.** The browser replays the shot list and films it through the Chrome DevTools screencast, each shot exactly as long as its line. Every step has a timeout. A step that fails is cut from the edit, never faked, and if no planned shot works at all, Premiere reshoots a simpler tour of the page.
+1. **Capture.** A locked-down Playwright browser opens the URL at 1920×1080, clears cookie banners, waits for the app to finish drawing, and maps every button, link and section, with screenshots. It signs in only through a demo link the person gives; otherwise, behind a login wall, it stays on the public pages. A site that answers with a bot check gets a clear refusal rather than a trailer of the check.
+2. **Script.** One call to Claude Opus 5.5 reads the screenshots, the page map and any director's notes, and returns a shot list sized to the running time as structured JSON: what to click, hover, type or scroll to, one line of narration per shot, a punch title for each, and a judgment on whether the page is fit for the public gallery. There is no agent loop. The plan is validated (unknown elements, external links, destructive clicks and typing into sensitive fields are dropped), and if Claude is unavailable or over budget, a planner with no AI writes the script from the page's own words.
+3. **Voice.** Deepgram Aura-2 reads each line, and Deepgram nova-3 transcribes it back so every word gets a timestamp for the captions. The browser for the shoot is already opening the app meanwhile. If Deepgram is down, Kokoro, an open-source voice model running on the worker, reads the script instead; if that fails too, the trailer still ships, with captions and music.
+4. **Shoot.** The browser replays the shot list and films it through the Chrome DevTools screencast, each shot exactly as long as its line. A click on something inside a closed menu opens the menu first. Every step has a timeout. A step that fails is cut from the edit, never faked, and if no planned shot works at all, Premiere reshoots a simpler tour of the page. Only one job films at a time, so two shoots never compete for the machine and drop frames.
 5. **Sound.** A score synthesized in code to the plan's mood, with hits on the titles and ticks on the clicks, ducked under the narration and mastered with ffmpeg.
-6. **Cut.** Remotion renders the trailer: a virtual camera that eases toward each click, a spotlight on the thing being used, a drawn cursor (headless browsers record none), captions in the chosen look, an end card with your URL, and the two thumbnails.
+6. **Cut.** Remotion renders the trailer: a virtual camera that eases toward each click, a spotlight on the thing being used, a drawn cursor (headless browsers record none), captions in the chosen look, titles in your app's own color, an end card with your URL, and the two thumbnails. A vertical cut carries the footage as a card across the middle of the frame, with the app's name above it and the captions below.
 
 ## For AI agents
 
@@ -47,7 +53,9 @@ curl -X POST "$PREMIERE/api/x402/trailers" \
   -d '{"url": "https://yourapp.xyz", "style": "hype"}'
 ```
 
-`$PREMIERE` is the site's address. The reply is `202 { id, status, page }`. Poll `GET /api/jobs/:id` until `result.trailer` is set, then fetch the files from `/api/jobs/:id/files/`. Once payments are on, the first request returns `402` with a `PAYMENT-REQUIRED` header; the agent signs a USDC authorization on Base and repeats the request with `PAYMENT-SIGNATURE`. `GET /api/x402/trailers` describes the endpoint and the current price.
+`$PREMIERE` is the site's address. The body also takes `voice`, `captions`, `length`, `format`, `notes`, `demoUrl` and `gallery` (off unless sent as `true`). The reply is `202 { id, status, page }`. Poll `GET /api/jobs/:id` until `result.trailer` is set, then fetch the files from `/api/jobs/:id/files/`. Once payments are on, the first request returns `402` with a `PAYMENT-REQUIRED` header; the agent signs a USDC authorization on Base and repeats the request with `PAYMENT-SIGNATURE`. `GET /api/x402/trailers` describes the endpoint and the current price.
+
+Coding agents can use the MCP server in [`mcp/`](mcp/README.md) instead: Claude Code, Claude Desktop or Cursor gets `make_trailer`, `trailer_status` and `premiere_options`, so "make a launch trailer of my app" is one sentence to the agent.
 
 ## Built with AI
 
@@ -79,6 +87,7 @@ From the command line:
 
 ```bash
 npm run trailer -- https://yourapp.xyz --style walkthrough --voice athena
+npm run trailer -- https://yourapp.xyz --length 15 --format vertical --notes "Click Generate"
 ```
 
 | Command | What it does |
@@ -94,6 +103,7 @@ npm run trailer -- https://yourapp.xyz --style walkthrough --voice athena
 ## Layout
 
 - `web/`: the site and its API, in Next.js 16. The browser only ever talks to the site, which talks to the worker server-side.
+- `mcp/`: the MCP server that lets coding agents order trailers through the site's public API.
 - `worker/`: the job server and the pipeline, in Node with Playwright, Remotion and ffmpeg. `capture/`, `planner/`, `voice/`, `record/`, `audio/` and `render/` are the six steps; `safety/` holds the URL checks and the egress proxy; `payments/` holds x402.
 
 The worker needs a real machine (a small VPS will do), since it drives a browser and renders video.

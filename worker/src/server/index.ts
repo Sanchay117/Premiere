@@ -6,7 +6,7 @@
 //   GET  /jobs/:id/files/:name    -> a screenshot, or the trailer, thumbnails and captions once rendered
 //   GET  /gallery                 -> approved trailers whose makers opted in, newest first
 //   GET  /pricing                 -> free, or the price, network and receiving address
-//   POST /x402/trailers           { url, style?, voice?, captions? } -> 202 { id, status, page }; with payments
+//   POST /x402/trailers           { url, style?, voice?, captions?, length?, format?, notes?, demoUrl?, gallery? } -> 202 { id, status, page }; with payments
 //                                   on, 402 + PAYMENT-REQUIRED until it carries a PAYMENT-SIGNATURE
 //   GET  /health
 // Binds to 127.0.0.1 by default. Set WORKER_TOKEN (here and in the web app) before exposing it.
@@ -48,8 +48,10 @@ type JobRequest =
   | { ok: true; url: URL; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined; notes: string | null; demoUrl: string | null }
   | { ok: false; status: number; error: string };
 
-/** Parses and checks an order for a trailer. The URL is vetted before anything is charged. */
-async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
+/** Parses and checks an order for a trailer. The URL is vetted before anything is charged. The
+ *  website always says whether a trailer may hang in the gallery; for other callers, galleryDefault
+ *  decides. */
+async function readJobRequest(req: http.IncomingMessage, galleryDefault = true): Promise<JobRequest> {
   let body: Record<string, unknown>;
   try {
     body = await readJson(req);
@@ -80,7 +82,7 @@ async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
     url,
     demoUrl,
     options: parseOptions(body),
-    gallery: body.gallery !== false,
+    gallery: typeof body.gallery === "boolean" ? body.gallery : galleryDefault,
     fresh: body.fresh === true,
     code: typeof body.code === "string" ? body.code.slice(0, 64) : undefined,
     notes: parseNotes(body.notes),
@@ -139,12 +141,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   }
 
   // One request orders a trailer: for agents, and for people paying from the website.
+  // An agent's trailer stays out of the gallery unless the order says otherwise.
   if (req.method === "POST" && pathname === "/x402/trailers") {
-    const order = await readJobRequest(req);
+    const order = await readJobRequest(req, false);
     if (!order.ok) return send(res, order.status, { error: order.error });
     if (!paymentsEnabled()) {
       const decision = await admit(order.code, visitorOf(req));
-      if (!decision.ok) return send(res, 403, { error: decision.reason });
+      if (!decision.ok) return send(res, 403, { error: decision.reason, needsCode: decision.needsCode ?? false });
       const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes, demoUrl: order.demoUrl });
       console.log(`job ${job.id.slice(0, 8)} ordered over x402 (free)`);
       return send(res, 202, { ...jobLinks(job.id), free: true, note: "Trailers are free until 16 Nov 2026." });

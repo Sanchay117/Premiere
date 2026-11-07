@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
+    "@huggingface/transformers": "^3.8.1",
     "@remotion/bundler": "^4.0.541",
     "@remotion/google-fonts": "^4.0.541",
     "@remotion/renderer": "^4.0.541",

@@ -157,7 +157,7 @@ export function alignWords(text: string, transcript: DeepgramWord[], duration: n
 
 /** Voices every narration line of a plan: hook, each shot, close. */
 /** The lines a plan is read in: the hook, one per shot, and the close. */
-function scriptLines(plan: Plan): { key: string; text: string }[] {
+export function scriptLines(plan: Plan): { key: string; text: string }[] {
   return [
     { key: "hook", text: plan.hook },
     ...plan.shots.map((s, i) => ({ key: `shot-${i + 1}`, text: s.narration })),

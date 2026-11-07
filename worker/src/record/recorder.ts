@@ -6,7 +6,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BrowserContext, Locator, Page } from "playwright";
-import { waitForContent } from "../capture/capture";
+import { waitForContent, type BrowserSession } from "../capture/capture";
 import { dismissCookieBanners } from "../capture/cookies";
 import type { Capture, CapturedElement } from "../capture/types";
 import { DESTRUCTIVE_TEXT, LOGIN_TEXT } from "../planner/fallback";
@@ -189,6 +189,8 @@ export interface RecordOptions {
   maxSeconds?: number;
   /** A stage opened earlier with openStage, so filming starts at once. Opened here if missing. */
   stage?: Promise<Stage>;
+  /** A demo link's signed-in session, for a stage opened here. */
+  session?: BrowserSession;
 }
 
 /** The app open in the hardened browser, cookie banners cleared, ready to film. */
@@ -203,12 +205,17 @@ export interface Stage {
 
 /** Opens the app for the shoot. The pipeline starts this while the narrator records, so the
  *  browser launch and page load are not on the clock. */
-export async function openStage(capture: Capture): Promise<Stage> {
+export async function openStage(capture: Capture, session?: BrowserSession): Promise<Stage> {
   const landing = (await assertPublicUrl(capture.finalUrl)).href;
   const safe = await launchSafeBrowser();
   try {
     // Filmed at 1.5x pixel density so the render can zoom toward a target without going soft.
-    const context: BrowserContext = await newSafeContext(safe.browser, { viewport: FRAME, deviceScaleFactor: PIXEL_DENSITY });
+    // A demo link's capture hands over its signed-in session, so the shoot lands signed in too.
+    const context: BrowserContext = await newSafeContext(safe.browser, {
+      viewport: FRAME,
+      deviceScaleFactor: PIXEL_DENSITY,
+      ...(session ? { storageState: session } : {}),
+    });
     const page = await context.newPage();
     context.on("page", (popup) => {
       if (popup !== page) popup.close().catch(() => {});
@@ -242,7 +249,7 @@ export async function recordPlan(capture: Capture, plan: Plan, options: RecordOp
   const budgetMs = (options.maxSeconds ?? options.holds.reduce((a, b) => a + b, 0) + 75) * 1000;
 
   progress("Opening the app for the shoot");
-  const { safe, context, page, landing, startedAt } = await (options.stage ?? openStage(capture));
+  const { safe, context, page, landing, startedAt } = await (options.stage ?? openStage(capture, options.session));
   const frames: RecordedFrame[] = [];
   const shots: RecordedShot[] = [];
   let writes: Promise<unknown> = Promise.resolve();

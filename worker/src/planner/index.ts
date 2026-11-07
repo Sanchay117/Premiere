@@ -35,6 +35,8 @@ export interface PlanOptions {
   length?: TrailerLength;
   /** Director's notes on what to film. The no-AI planner cannot read them. */
   notes?: string;
+  /** A signed-in capture: its plan is neither read from nor written to the cache. */
+  private?: boolean;
 }
 
 function useFallback(stored: StoredCapture, style: TrailerStyle, length: TrailerLength, reason: string, attempt: ClaudeAttempt | null = null): PlanResult {
@@ -59,7 +61,7 @@ export async function planTrailer(stored: StoredCapture, options: PlanOptions = 
     return { plan: v.plan, source: "mock", model: mock.model, reason: null, issues: v.issues, words: v.words, attempt: null };
   }
 
-  if (!options.fresh) {
+  if (!options.fresh && !options.private) {
     const cached = await readCachedPlan(capture, model, { style, length, notes: options.notes });
     if (cached) {
       const v = validatePlan(cached.plan, capture, style, length);
@@ -75,6 +77,6 @@ export async function planTrailer(stored: StoredCapture, options: PlanOptions = 
   const v = validatePlan(attempt.plan, capture, style, length);
   if (!v.usable) return useFallback(stored, style, length, `the ${aliasOf(model)} plan failed checks: ${v.issues.join("; ")}`, attempt);
 
-  await writeCachedPlan(capture, v.plan, { source: "claude", model, effort, style, length, notes: options.notes });
+  if (!options.private) await writeCachedPlan(capture, v.plan, { source: "claude", model, effort, style, length, notes: options.notes });
   return { plan: v.plan, source: "claude", model, reason: null, issues: v.issues, words: v.words, attempt };
 }

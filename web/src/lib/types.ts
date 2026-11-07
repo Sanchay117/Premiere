@@ -114,6 +114,8 @@ export interface JobView {
   gallery?: boolean;
   /** Director's notes on what to film, if the person gave any. */
   notes?: string | null;
+  /** Filmed signed in through a demo link (the link itself is never sent back). */
+  demo?: boolean;
 }
 
 export interface GalleryEntry {

@@ -4,7 +4,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import sharp from "sharp";
 import { launchSafeBrowser, newSafeContext, type SafeBrowser } from "../safety/browser";
 import { assertPublicHost, assertPublicUrl } from "../safety/url-guard";
@@ -42,7 +42,13 @@ export interface CaptureOptions {
   totalTimeoutMs?: number;
   /** Human-readable progress, shown live on the job page. */
   onProgress?: (detail: string) => void;
+  /** Receives the browser's cookies and storage just before it closes. For a signed-in demo link:
+   *  the shoot reuses this session, so a single-use link is only ever opened once. Memory only. */
+  onSession?: ((session: BrowserSession) => void) | null;
 }
+
+/** A browser's signed-in state (cookies and local storage), as Playwright saves it. */
+export type BrowserSession = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
 interface Extracted {
   title: string;
@@ -212,6 +218,7 @@ async function run({ browser, proxy }: SafeBrowser, url: URL, options: Required<
     });
   }
 
+  if (options.onSession) options.onSession(await context.storageState());
   await context.close();
   if (proxy.blocked.size) {
     warnings.push(`Blocked requests to ${proxy.blocked.size} private or unknown host(s): ${[...proxy.blocked].slice(0, 3).join(", ")}.`);
@@ -252,6 +259,7 @@ export async function capturePage(rawUrl: string, opts: CaptureOptions): Promise
     // After the spread: callers pass onProgress: undefined when they have none, which would
     // otherwise replace this default (npm run capture failed with "progress is not a function").
     onProgress: opts.onProgress ?? (() => {}),
+    onSession: opts.onSession ?? null,
   };
   const url = await assertPublicUrl(rawUrl);
   await mkdir(options.outDir, { recursive: true });

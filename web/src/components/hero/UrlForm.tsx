@@ -20,6 +20,9 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
   const [gallery, setGallery] = useState(true);
   const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
+  const [demoUrl, setDemoUrl] = useState("");
+  const [showDemo, setShowDemo] = useState(false);
+  const demo = demoUrl.trim().length > 0;
   const [code, setCode] = useState("");
   const [needsCode, setNeedsCode] = useState(false);
   const [pricing, setPricing] = useState<Pricing | null>(null);
@@ -45,7 +48,18 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
       return;
     }
     setState("sending");
-    const order = { url, style, length, voice, captions, gallery, notes: notes.trim() || undefined, code: code.trim() || undefined };
+    const order = {
+      url,
+      style,
+      length,
+      voice,
+      captions,
+      // A trailer filmed signed in shows a private account, so it stays out of the gallery.
+      gallery: gallery && !demo,
+      notes: notes.trim() || undefined,
+      demoUrl: demoUrl.trim() || undefined,
+      code: code.trim() || undefined,
+    };
     let id: string | undefined;
     try {
       if (paid && pricing) {
@@ -117,7 +131,21 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
               {error}
             </p>
           )}
-          {showNotes ? (
+          {(!showNotes || !showDemo) && (
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+              {!showNotes && (
+                <button type="button" onClick={() => setShowNotes(true)} className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-ticket hover:underline">
+                  + Add director&apos;s notes
+                </button>
+              )}
+              {!showDemo && (
+                <button type="button" onClick={() => setShowDemo(true)} className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-ticket hover:underline">
+                  + Add a signed-in demo link
+                </button>
+              )}
+            </div>
+          )}
+          {showNotes && (
             <div className="mt-3">
               <label htmlFor="notes">
                 <FormLabel>Director&apos;s notes</FormLabel>
@@ -138,14 +166,27 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
                 </span>
               </p>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowNotes(true)}
-              className="mt-3 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-ticket hover:underline"
-            >
-              + Add director&apos;s notes
-            </button>
+          )}
+          {showDemo && (
+            <div className="mt-3">
+              <label htmlFor="demo">
+                <FormLabel>Signed-in demo link</FormLabel>
+              </label>
+              <input
+                id="demo"
+                type="url"
+                value={demoUrl}
+                onChange={(e) => setDemoUrl(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="https://yourapp.xyz/demo?token=..."
+                className="mt-1.5 block w-full border-2 border-paper-ink/40 bg-[#fbf6ea] px-3 py-2 font-mono text-[13px] text-paper-ink outline-none placeholder:text-paper-dim/70 focus:border-ticket"
+              />
+              <p className="mt-1 text-[12px] leading-snug text-paper-dim">
+                For an app behind a login: a link that opens it already signed in to a demo account. Premiere opens it once, never shows it, and
+                keeps the trailer out of the gallery. Use a throwaway demo account, never your own.
+              </p>
+            </div>
           )}
           {needsCode && (
             <div className="mt-3 flex items-center gap-3">
@@ -171,8 +212,14 @@ export function UrlForm({ url = "", onUrlChange: setUrl }: { url?: string; onUrl
 
         <div className="border-t-2 border-dashed border-paper-ink/25 pt-4">
           <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-paper-ink">
-            <input type="checkbox" checked={gallery} onChange={(e) => setGallery(e.target.checked)} className="size-4 accent-[#c8372d]" />
-            Show it in the gallery
+            <input
+              type="checkbox"
+              checked={gallery && !demo}
+              disabled={demo}
+              onChange={(e) => setGallery(e.target.checked)}
+              className="size-4 accent-[#c8372d] disabled:opacity-50"
+            />
+            {demo ? "Kept out of the gallery (signed-in demo)" : "Show it in the gallery"}
           </label>
         </div>
       </div>

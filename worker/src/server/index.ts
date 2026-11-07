@@ -43,7 +43,7 @@ function send(res: http.ServerResponse, status: number, body: unknown, headers: 
 }
 
 type JobRequest =
-  | { ok: true; url: URL; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined; notes: string | null }
+  | { ok: true; url: URL; options: TrailerOptions; gallery: boolean; fresh: boolean; code: string | undefined; notes: string | null; demoUrl: string | null }
   | { ok: false; status: number; error: string };
 
 /** Parses and checks an order for a trailer. The URL is vetted before anything is charged. */
@@ -63,9 +63,20 @@ async function readJobRequest(req: http.IncomingMessage): Promise<JobRequest> {
     const message = err instanceof UnsafeUrlError || err instanceof Error ? err.message : "That link does not work.";
     return { ok: false, status: 400, error: message };
   }
+  // A demo link opens the app signed in. It gets the same safety checks as any URL, and it is
+  // never echoed back, logged or saved.
+  let demoUrl: string | null = null;
+  if (typeof body.demoUrl === "string" && body.demoUrl.trim()) {
+    try {
+      demoUrl = (await assertPublicUrl(body.demoUrl.trim().slice(0, 2000))).href;
+    } catch {
+      return { ok: false, status: 400, error: "That demo link does not work. It needs to be a public http or https link." };
+    }
+  }
   return {
     ok: true,
     url,
+    demoUrl,
     options: parseOptions(body),
     gallery: body.gallery !== false,
     fresh: body.fresh === true,
@@ -120,7 +131,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     }
     const decision = await admit(order.code, visitorOf(req));
     if (!decision.ok) return send(res, 403, { error: decision.reason, needsCode: decision.needsCode ?? false });
-    const job = createJob(order.url.href, order.fresh, order.options, order.gallery, { notes: order.notes });
+    const job = createJob(order.url.href, order.fresh, order.options, order.gallery, { notes: order.notes, demoUrl: order.demoUrl });
     console.log(`job ${job.id.slice(0, 8)} admitted${decision.code ? ` with code ${decision.code}` : ""}`);
     return send(res, 202, { id: job.id });
   }
@@ -132,14 +143,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (!paymentsEnabled()) {
       const decision = await admit(order.code, visitorOf(req));
       if (!decision.ok) return send(res, 403, { error: decision.reason });
-      const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes });
+      const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes, demoUrl: order.demoUrl });
       console.log(`job ${job.id.slice(0, 8)} ordered over x402 (free)`);
       return send(res, 202, { ...jobLinks(job.id), free: true, note: "Trailers are free until 16 Nov 2026." });
     }
     const signature = req.headers["payment-signature"];
     const paid = await charge(typeof signature === "string" ? signature : undefined);
     if (!paid.ok) return send(res, paid.status, { error: paid.error }, paid.headers);
-    const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes });
+    const job = createJob(order.url.href, false, order.options, order.gallery, { notes: order.notes, demoUrl: order.demoUrl });
     console.log(`job ${job.id.slice(0, 8)} paid by ${paid.payer}, tx ${paid.transaction}`);
     return send(res, 202, { ...jobLinks(job.id), free: false, transaction: paid.transaction }, paid.headers);
   }

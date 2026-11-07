@@ -1,8 +1,8 @@
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config";
 import { normalizeUrl, urlSlug } from "../lib/url";
-import { capturePage } from "./capture";
+import { capturePage, type BrowserSession } from "./capture";
 import { CAPTURE_VERSION, type Capture, type StoredCapture } from "./types";
 
 export function captureDir(url: URL): string {
@@ -23,6 +23,28 @@ type Loaded = StoredCapture & { cached: boolean };
 /** Captures in progress, by folder: two jobs for the same page share one capture instead of both
  *  writing into the same folder at once. */
 const inflight = new Map<string, Promise<Loaded>>();
+
+/** The address without its query or fragment, where a demo link's token usually sits. */
+const withoutSecrets = (href: string) => {
+  const u = new URL(href);
+  return `${u.origin}${u.pathname}`;
+};
+
+/**
+ * Captures a signed-in demo link for one job: in the job's own folder, never cached or shared with
+ * other orders. The link's address is replaced by the app's public one, and the address it landed
+ * on loses its query and fragment, so a token in the link never reaches the planner, the job's
+ * page or its files. The signed-in session is kept in memory for the shoot.
+ */
+export async function captureDemo(publicUrl: string, demoUrl: string, dir: string, onProgress?: (detail: string) => void): Promise<Loaded> {
+  await rm(dir, { recursive: true, force: true });
+  await mkdir(dir, { recursive: true });
+  let session: BrowserSession | undefined;
+  const raw = await capturePage(demoUrl, { outDir: dir, onProgress, onSession: (s) => (session = s) });
+  const capture: Capture = { ...raw, url: publicUrl, finalUrl: withoutSecrets(raw.finalUrl) };
+  await writeFile(path.join(dir, "capture.json"), JSON.stringify(capture, null, 2));
+  return { capture, dir, cached: false, session };
+}
 
 /** Reuses the saved capture for this URL unless `fresh` is set. */
 export function loadOrCapture(

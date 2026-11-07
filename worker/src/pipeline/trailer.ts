@@ -128,7 +128,7 @@ export async function makeTrailer(
   // Voice, while the app opens for the shoot in the background: the browser launch, page load
   // and the app's own boot happen during the narration instead of after it.
   hooks.onStepStart?.("voice", "The narrator is reading the script");
-  const stage = openStage(capture);
+  const stage = openStage(capture, stored.session);
   stage.catch(() => {}); // the recorder awaits it, and a failure surfaces there
   let shotPlan = plan;
   let voiced = await voiceOrCaptions(shotPlan, options, (d) => hooks.onStepProgress?.("voice", d));
@@ -153,7 +153,7 @@ export async function makeTrailer(
     shotPlan = { ...plan, shots: validatePlan(fallbackPlan(capture, options.length), capture, options.style, options.length).plan.shots };
     voiced = voiced.narrated ? await voiceOrCaptions(shotPlan, options, onRecordProgress) : { lines: silentLines(shotPlan), narrated: false };
     recording = await inFilmingSlot(
-      () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style, options.length), outDir: jobDir, onProgress: onRecordProgress }),
+      () => recordPlan(capture, shotPlan, { holds: shotHolds(voiced.lines, shotPlan, options.style, options.length), outDir: jobDir, onProgress: onRecordProgress, session: stored.session }),
       waitForTurn,
     );
     timeline = buildTimeline(voiced.lines, shotPlan, recording, options.style, options.length);

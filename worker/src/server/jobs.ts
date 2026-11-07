@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { CaptureError } from "../capture/capture";
-import { loadOrCapture } from "../capture/store";
+import { captureDemo, loadOrCapture } from "../capture/store";
 import { aliasOf, config, MODELS } from "../config";
 import type { TrailerOptions } from "../options";
 import { makeTrailer } from "../pipeline/trailer";
@@ -17,6 +17,8 @@ import type { JobStepView, JobView, PlannerChoice, StepKey } from "./types";
 
 export interface Job extends JobView {
   fresh: boolean;
+  /** A link that opens the app signed in to a demo account. Secret: never in the view, never saved. */
+  demoUrl: string | null;
   /** Capture directory, for serving screenshots. */
   dir: string | null;
   /** Job output directory: frames, soundtrack, trailer, thumbnails, captions. */
@@ -84,7 +86,13 @@ function finishStep(job: Job, key: StepKey, status: "done" | "failed", detail: s
 
 /** Every job's script is written by the configured model (PLANNER_MODEL, Claude Opus 5.5 unless
  *  set), with the no-AI planner as the fallback when Claude is unavailable or over budget. */
-export function createJob(url: string, fresh: boolean, options: TrailerOptions, gallery: boolean, extras: { notes?: string | null } = {}): Job {
+export function createJob(
+  url: string,
+  fresh: boolean,
+  options: TrailerOptions,
+  gallery: boolean,
+  extras: { notes?: string | null; demoUrl?: string | null } = {},
+): Job {
   const planner: PlannerChoice = aliasOf(config.model);
   const id = randomUUID();
   const job: Job = {
@@ -100,7 +108,10 @@ export function createJob(url: string, fresh: boolean, options: TrailerOptions, 
     error: null,
     result: null,
     options,
-    gallery,
+    // A trailer filmed signed in shows a private account, so it never hangs in the gallery.
+    gallery: gallery && !extras.demoUrl,
+    demo: Boolean(extras.demoUrl),
+    demoUrl: extras.demoUrl ?? null,
     notes: extras.notes ?? null,
     fresh,
     dir: null,
@@ -133,6 +144,8 @@ export async function findJob(id: string): Promise<Job | undefined> {
       ...saved.view,
       queuePosition: null,
       fresh: false,
+      // A finished job no longer needs its demo link, and it was never saved.
+      demoUrl: null,
       dir: saved.captureDir ? path.join(config.dataDir, saved.captureDir) : null,
       outDir: jobDir(id),
     };
@@ -142,7 +155,7 @@ export async function findJob(id: string): Promise<Job | undefined> {
 }
 
 export function toView(job: Job): JobView {
-  const { fresh: _fresh, dir: _dir, outDir: _outDir, ...view } = job;
+  const { fresh: _fresh, dir: _dir, outDir: _outDir, demoUrl: _demoUrl, ...view } = job;
   const position = queue.indexOf(job.id);
   // Every slot is busy while anyone waits, so this job starts after `position` more jobs finish,
   // spread over the slots.
@@ -192,13 +205,13 @@ async function run(job: Job): Promise<void> {
   let current: StepKey = "capture";
   try {
     startStep(job, "capture", "Starting a fresh browser");
-    const stored = await loadOrCapture(job.url, {
-      fresh: job.fresh,
-      onProgress: (detail) => {
-        step(job, "capture").detail = detail;
-        touch(job);
-      },
-    });
+    const onCaptureProgress = (detail: string) => {
+      step(job, "capture").detail = detail;
+      touch(job);
+    };
+    const stored = job.demoUrl
+      ? await captureDemo(job.url, job.demoUrl, path.join(job.outDir, "capture"), onCaptureProgress)
+      : await loadOrCapture(job.url, { fresh: job.fresh, onProgress: onCaptureProgress });
     job.dir = stored.dir;
     const c = stored.capture;
     const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -221,7 +234,9 @@ async function run(job: Job): Promise<void> {
     );
     const result = await planTrailer(
       stored,
-      job.planner === "none" ? { planner: "fallback", style, length } : { planner: "claude", model: MODELS[job.planner], style, length, notes: job.notes ?? undefined },
+      job.planner === "none"
+        ? { planner: "fallback", style, length }
+        : { planner: "claude", model: MODELS[job.planner], style, length, notes: job.notes ?? undefined, private: Boolean(job.demoUrl) },
     );
     const attempt = result.attempt;
     const shots = result.plan.shots.length;

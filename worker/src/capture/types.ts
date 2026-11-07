@@ -1,3 +1,5 @@
+import type { BrowserSession } from "./capture";
+
 /** Bump when the capture format changes, so saved captures are taken again. */
 export const CAPTURE_VERSION = 2;
 
@@ -85,4 +87,6 @@ export interface Capture {
 export interface StoredCapture {
   capture: Capture;
   dir: string;
+  /** The signed-in session from a demo link's capture, for the shoot. Never saved to disk. */
+  session?: BrowserSession;
 }

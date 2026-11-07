@@ -140,7 +140,8 @@ film(recutPlay, [
 const walkEnd = t;
 const formats = beat("formats", 6.8);
 const agents = beat("agents", 8.4);
-const close = beat("close", 12.5);
+// 11.9 s keeps the whole cut at 139.5 s, under X's 140 second limit for most accounts.
+const close = beat("close", 11.9);
 const duration = t;
 
 /** Video time for a recording time, through the parts. */

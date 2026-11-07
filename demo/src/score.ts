@@ -646,6 +646,12 @@ export async function makeSoundtrack(props: DemoProps, outFile: string, cues: Cu
     const lastWord = lastLine.words.at(-1);
     const target = lastLine.at + (lastWord ? lastWord.start : lastLine.duration - 0.4);
     const hit = close.start + Math.round((target - close.start) / BEAT) * BEAT;
+    // The bed stops on its last full bar; a riser carries the gap up to the close's first hit.
+    const bedStop = bedFrom + bedBars * BAR;
+    if (close.start - bedStop > 0.4) {
+      s.riser(bedStop, close.start, 0.42);
+      s.reverseCymbal(Math.max(bedStop, close.start - 1.0), close.start, 0.35);
+    }
     s.impact(close.start, 0.8);
     const bars = Math.max(1, Math.floor((hit - close.start) / BAR));
     s.groove(close.start, close.start + bars * BAR, ["Am", "F", "C", "G"], "full");

@@ -12,7 +12,7 @@ Every vibecoded app needs a demo video: for the launch post, the hackathon entry
 
 Built in a week for Vibestarter's Vibeathon 02 (Night shift).
 
-<!-- Live site: add the URL here once it is deployed. -->
+**Live:** https://premiere-trailers.duckdns.org
 
 ## What you get
 

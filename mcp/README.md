@@ -8,14 +8,14 @@ The server runs on your machine over stdio and calls a Premiere site's public AP
 
 - Node 22 or later.
 - This repository, with `npm install` run at its root (the server loads the MCP SDK and zod from there).
-- The address of a Premiere site, set as `PREMIERE_URL`. Without it the server uses `http://localhost:3000`, the site `npm run dev` starts.
+- The address of a Premiere site, set as `PREMIERE_URL`: the live one is `https://premiere-trailers.duckdns.org`. Without it the server uses `http://localhost:3000`, the site `npm run dev` starts.
 
-Below, replace `/path/to/Premiere` with the repository's absolute path and `https://your-premiere-site` with the site's address.
+Below, replace `/path/to/Premiere` with the repository's absolute path. The examples use the live site; to use another Premiere site, change `PREMIERE_URL`.
 
 ## Claude Code
 
 ```bash
-claude mcp add --env PREMIERE_URL=https://your-premiere-site --scope user premiere -- npx -y tsx /path/to/Premiere/mcp/src/index.ts
+claude mcp add --env PREMIERE_URL=https://premiere-trailers.duckdns.org --scope user premiere -- npx -y tsx /path/to/Premiere/mcp/src/index.ts
 ```
 
 Options go before the name, `premiere`, and everything after `--` is the command that starts the server. `--scope user` makes it available in every project; leave it out to add it to the current project only. Check it with `claude mcp list`, or `/mcp` inside a session.
@@ -32,7 +32,7 @@ Settings > Developer > Edit Config opens `claude_desktop_config.json` (in `~/Lib
     "premiere": {
       "command": "npx",
       "args": ["-y", "tsx", "/path/to/Premiere/mcp/src/index.ts"],
-      "env": { "PREMIERE_URL": "https://your-premiere-site" }
+      "env": { "PREMIERE_URL": "https://premiere-trailers.duckdns.org" }
     }
   }
 }
@@ -50,7 +50,7 @@ Add the same block to `~/.cursor/mcp.json` (every project) or to `.cursor/mcp.js
     "premiere": {
       "command": "npx",
       "args": ["-y", "tsx", "/path/to/Premiere/mcp/src/index.ts"],
-      "env": { "PREMIERE_URL": "https://your-premiere-site" }
+      "env": { "PREMIERE_URL": "https://premiere-trailers.duckdns.org" }
     }
   }
 }
@@ -83,11 +83,11 @@ The agent calls `make_trailer`, then `trailer_status` with a wait, and answers f
 ```
 Status: done. "Example Domain", 42.4 s.
 Cut: walkthrough. Narrator: Athena. Captions: karaoke. Format: landscape.
-Trailer: https://your-premiere-site/api/jobs/<id>/files/trailer.mp4
-Thumbnail: https://your-premiere-site/api/jobs/<id>/files/thumbnail-1920.png
-Thumbnail: https://your-premiere-site/api/jobs/<id>/files/thumbnail-1280.png
-Captions (SRT): https://your-premiere-site/api/jobs/<id>/files/captions.srt
-Screening room (watch, download, share): https://your-premiere-site/jobs/<id>
+Trailer: https://premiere-trailers.duckdns.org/api/jobs/<id>/files/trailer.mp4
+Thumbnail: https://premiere-trailers.duckdns.org/api/jobs/<id>/files/thumbnail-1920.png
+Thumbnail: https://premiere-trailers.duckdns.org/api/jobs/<id>/files/thumbnail-1280.png
+Captions (SRT): https://premiere-trailers.duckdns.org/api/jobs/<id>/files/captions.srt
+Screening room (watch, download, share): https://premiere-trailers.duckdns.org/jobs/<id>
 Add ?download=1 to a file link to download it under its own name.
 ```
 

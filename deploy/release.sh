@@ -42,11 +42,12 @@ ls -1dt /opt/premiere/releases/*/ | tail -n +4 | xargs -r rm -rf
 rm -f "$tarball"
 
 echo "== Health"
+token=$(sed -n 's/^WORKER_TOKEN=//p' /etc/premiere/premiere.env)
 for i in $(seq 1 30); do
-  if curl -fsS -o /dev/null http://127.0.0.1:3000/ 2>/dev/null; then break; fi
+  if curl -fsS -o /dev/null http://127.0.0.1:3000/ 2>/dev/null \
+    && curl -fsS -o /dev/null -H "authorization: Bearer $token" http://127.0.0.1:8787/health 2>/dev/null; then break; fi
   sleep 2
 done
-token=$(sed -n 's/^WORKER_TOKEN=//p' /etc/premiere/premiere.env)
 echo "worker: $(curl -sS -H "authorization: Bearer $token" http://127.0.0.1:8787/health)"
 echo "site:   HTTP $(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/)"
 echo "Released $name."

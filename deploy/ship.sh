@@ -4,7 +4,8 @@
 #
 #   deploy/ship.sh
 #
-# On Windows (Git Bash), point GCLOUD at gcloud.cmd if gcloud is not on the PATH.
+# On Windows, run it from Git Bash with GCLOUD set to the SDK's bin/gcloud shell script, not
+# gcloud.cmd: cmd.exe mangles the quoted remote command when the SDK path has spaces in it.
 set -euo pipefail
 
 PROJECT=${PROJECT:-premiere-trailers}

@@ -1,0 +1,23 @@
+[Unit]
+Description=Premiere site (Next.js), behind Caddy
+After=network-online.target premiere-worker.service
+Wants=network-online.target
+
+[Service]
+User=premiere
+Group=premiere
+WorkingDirectory=/opt/premiere/current/web
+EnvironmentFile=/etc/premiere/web.env
+Environment=NODE_ENV=production
+Environment=HOME=/var/lib/premiere
+# Listens on localhost only: visitors reach it through Caddy.
+ExecStart=/opt/premiere/current/node_modules/.bin/next start --hostname 127.0.0.1 --port 3000
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+[Unit]
+Description=Premiere worker: captures, plans, voices, films and renders trailers
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=premiere
+Group=premiere
+WorkingDirectory=/opt/premiere/current/worker
+EnvironmentFile=/etc/premiere/premiere.env
+Environment=HOME=/var/lib/premiere
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/premiere/browsers
+ExecStart=/opt/premiere/current/node_modules/.bin/tsx src/server/index.ts
+Restart=always
+RestartSec=5
+# Stopping kills the whole group, including any Chrome a job left running.
+TimeoutStopSec=20
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

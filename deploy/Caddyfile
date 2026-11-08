@@ -1,0 +1,15 @@
+# Premiere's front door. Caddy fetches and renews the HTTPS certificate by itself and passes every
+# request to the site (Next.js) on localhost. The worker is never exposed: the site reaches it on
+# 127.0.0.1:8787. setup.sh fills in the hosts and installs this as /etc/caddy/Caddyfile.
+#
+# No access log: the site never keeps visitors' IP addresses, and Caddy should not either. Caddy
+# also ignores X-Forwarded-For sent by visitors and sets it to the real address, so nobody can
+# dodge the daily free-trailer limit by forging the header.
+
+SITE_HOSTS {
+	request_body {
+		max_size 1MB
+	}
+	header -Server
+	reverse_proxy 127.0.0.1:3000
+}

@@ -110,4 +110,4 @@ npm run trailer -- https://yourapp.xyz --length 15 --format vertical --notes "Cl
 - `mcp/`: the MCP server that lets coding agents order trailers through the site's public API.
 - `worker/`: the job server and the pipeline, in Node with Playwright, Remotion and ffmpeg. `capture/`, `planner/`, `voice/`, `record/`, `audio/` and `render/` are the six steps; `safety/` holds the URL checks and the egress proxy; `payments/` holds x402.
 
-The worker needs a real machine (a small VPS will do), since it drives a browser and renders video.
+The worker needs a real machine (a small VPS will do), since it drives a browser and renders video. The live site runs the site and the worker together on one Google Cloud VM behind Caddy; `deploy/` holds the setup and release scripts.

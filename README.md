@@ -2,7 +2,7 @@
 
 **Paste a URL, get a launch trailer.**
 
-**Try it live: [premiere-trailers.duckdns.org](https://premiere-trailers.duckdns.org)** · **[Watch the demo](https://youtu.be/LVTVQveyp3U)** (2:19)
+**[Watch the demo](https://youtu.be/LVTVQveyp3U)** (2:19) · The live site, premiere-trailers.duckdns.org, ran through judging and is now offline. To try Premiere, [run it yourself](#run-it-yourself).
 
 [![Watch the demo: Premiere, from a link to a launch trailer](https://img.youtube.com/vi/LVTVQveyp3U/maxresdefault.jpg)](https://youtu.be/LVTVQveyp3U)
 
@@ -10,7 +10,7 @@ Premiere opens your app in a real browser, works out what it does, writes a scri
 
 Every vibecoded app needs a demo video: for the launch post, the hackathon entry, the raise page. Most founders skip it or lose a day making one. Premiere makes it from the link alone.
 
-Built in a week for Vibestarter's Vibeathon 02 (Night shift).
+Built in a week for Vibestarter's Vibeathon 02 (Night shift), where it placed 5th of 51.
 
 ## What you get
 
@@ -108,4 +108,4 @@ npm run trailer -- https://yourapp.xyz --length 15 --format vertical --notes "Cl
 - `mcp/`: the MCP server that lets coding agents order trailers through the site's public API.
 - `worker/`: the job server and the pipeline, in Node with Playwright, Remotion and ffmpeg. `capture/`, `planner/`, `voice/`, `record/`, `audio/` and `render/` are the six steps; `safety/` holds the URL checks and the egress proxy; `payments/` holds x402.
 
-The worker needs a real machine (a small VPS will do), since it drives a browser and renders video. The live site runs the site and the worker together on one Google Cloud VM behind Caddy; `deploy/` holds the setup and release scripts.
+The worker needs a real machine (a small VPS will do), since it drives a browser and renders video. The live site ran the site and the worker together on one Google Cloud VM behind Caddy until it was stopped after judging. `deploy/` holds the setup and release scripts, so it can be brought back.
